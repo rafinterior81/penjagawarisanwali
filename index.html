@@ -706,8 +706,9 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
 // URL Web App Anda di bawah ini (harus berakhiran "/exec").
 // Jika dibiarkan seperti ini, aplikasi tetap jalan memakai data bawaan
 // (mode offline/demo), tapi perubahan TIDAK akan tersimpan permanen.
-const API_URL = 'https://script.google.com/macros/s/AKfycbxHn1HazjDk7A-RDiy5I8wnxpx5w1AEQgVMoyuJQbRzlIAFRlEQIpmZlhBAB1G-93WL/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyl2rRCmj7OB6Q-XHLlfIIa8QiZRVXYp-m7SFwZWNscTSapYvhfxQY4GAL-yCUGBj8I/exec';
 let dbConnected = false;
+let lastApiError = '';
 
 // ═══════════════════════════════════════
 // DATABASE
@@ -924,6 +925,11 @@ let deleteTarget = null;
 let openPanel = '';
 
 // ─── KONEKSI DATABASE (API ke Google Apps Script) ───
+// Pastikan field yang seharusnya array (tags, tips, dll) selalu berupa array,
+// walau data dari sheet ternyata rusak/berupa teks biasa — supaya .map()/.join()
+// tidak pernah membuat aplikasi error.
+function asArr(v){ return Array.isArray(v) ? v : (v ? [v] : []); }
+
 function isApiConfigured(){
   return !!API_URL && API_URL.indexOf('PASTE_') === -1;
 }
@@ -936,10 +942,12 @@ async function apiGet(){
     clearTimeout(timeoutId);
     const json = await res.json();
     if(json && json.ok) return json;
-    console.error('Database merespons dengan error:', json && json.error);
+    lastApiError = 'Database merespons dengan error: '+(json && json.error);
+    console.error(lastApiError);
     return null;
   }catch(err){
     clearTimeout(timeoutId);
+    lastApiError = String(err && (err.message||err));
     console.error('Gagal mengambil data dari database (cek API_URL & status deployment Apps Script):', err);
     return null;
   }
@@ -1074,7 +1082,7 @@ function setDirFilter(w){dirFilter=w;dirPage=1;renderDir();}
 function onDirSearchInput(){dirPage=1;filterDir();}
 function filterDir(){
   const q=(document.getElementById('dir-search')||{value:''}).value.toLowerCase();
-  const list=DB.wali.filter(w=>(!q||w.nama.toLowerCase().includes(q)||w.lokasi.toLowerCase().includes(q)||(w.tags||[]).join(' ').toLowerCase().includes(q))&&(dirFilter==='Semua'||w.wilayah===dirFilter));
+  const list=DB.wali.filter(w=>(!q||w.nama.toLowerCase().includes(q)||w.lokasi.toLowerCase().includes(q)||asArr(w.tags).join(' ').toLowerCase().includes(q))&&(dirFilter==='Semua'||w.wilayah===dirFilter));
   const totalPages=Math.max(1,Math.ceil(list.length/DIR_PAGE_SIZE));
   if(dirPage>totalPages) dirPage=totalPages;
   if(dirPage<1) dirPage=1;
@@ -1085,7 +1093,7 @@ function filterDir(){
       <div class="dir-card-body">
         <div class="dir-card-name">${w.nama}</div>
         <div class="dir-card-loc">${w.lokasi}</div>
-        <div class="dir-tags">${(w.tags||[]).map(t=>`<span class="dtag">${t}</span>`).join('')}</div>
+        <div class="dir-tags">${asArr(w.tags).map(t=>`<span class="dtag">${t}</span>`).join('')}</div>
       </div>
     </div>`).join(''):'<div style="grid-column:1/-1;padding:40px;text-align:center;font-size:13px;color:var(--tmut)">Tidak ada data ditemukan</div>';
   const wilayahs=['Semua',...[...new Set(DB.wali.map(w=>w.wilayah))]];
@@ -1240,10 +1248,10 @@ function renderDetTab(){
       <div class="bio-text">${w.bio}</div>`;
   } else if(curDetTab===1){
     body.innerHTML=`<div class="sec-label">Nasab / Silsilah Keturunan</div><div class="nasab-tree">`+
-      (w.nasab||[]).map(n=>`<div class="nasab-item"><div class="nasab-gen">${n.gen}</div><div><div class="nasab-name">${n.nama}</div><div class="nasab-role">${n.role}</div></div></div>`).join('')+
+      asArr(w.nasab).map(n=>`<div class="nasab-item"><div class="nasab-gen">${n.gen}</div><div><div class="nasab-name">${n.nama}</div><div class="nasab-role">${n.role}</div></div></div>`).join('')+
       `</div><div style="background:var(--gl);border-radius:10px;padding:12px 14px;margin-top:4px"><div style="font-size:11px;font-weight:700;color:var(--gd);margin-bottom:4px">Catatan Nasab</div><div style="font-size:11px;color:var(--gm);line-height:1.6">Urutan nasab di atas berdasarkan berbagai sumber kitab sejarah dan manaqib yang beredar di kalangan ulama Nusantara.</div></div>`;
   } else if(curDetTab===2){
-    const fam=w.keluarga||[];
+    const fam=asArr(w.keluarga);
     body.innerHTML=`<div class="sec-label">Silsilah Keluarga</div>
     <div class="acc-wrap" style="border-top:none;border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`+
       (fam.length?fam.map((f,i)=>`
@@ -1262,23 +1270,23 @@ function renderDetTab(){
       `</div>`;
   } else if(curDetTab===3){
     body.innerHTML=`<div class="sec-label">Para Murid Utama</div><div class="murid-list">`+
-      (w.murid||[]).map((m,i)=>`<div class="murid-item"><div class="murid-num">${i+1}</div><div><div class="murid-name">${m.nama}</div><div class="murid-info">${m.info}</div></div></div>`).join('')+
+      asArr(w.murid).map((m,i)=>`<div class="murid-item"><div class="murid-num">${i+1}</div><div><div class="murid-name">${m.nama}</div><div class="murid-info">${m.info}</div></div></div>`).join('')+
       `</div>`;
   } else if(curDetTab===4){
     body.innerHTML=`<div class="sec-label">Ajaran & Filosofi</div><div class="ajaran-list">`+
-      (w.ajaran||[]).map((a,i)=>`<div class="ajaran-item"><div class="ajaran-num">Ajaran ${i+1}</div><div class="ajaran-text">${a.judul}</div><div class="ajaran-desc">${a.desc}</div></div>`).join('')+
+      asArr(w.ajaran).map((a,i)=>`<div class="ajaran-item"><div class="ajaran-num">Ajaran ${i+1}</div><div class="ajaran-text">${a.judul}</div><div class="ajaran-desc">${a.desc}</div></div>`).join('')+
       `</div>`;
   } else if(curDetTab===5){
     body.innerHTML=`<div class="sec-label">Hasil Karya</div><div class="karya-list">`+
-      (w.karya||[]).map((k,i)=>`<div class="karya-item"><div class="karya-icon">${i+1}</div><div><div class="karya-name">${k.nama}</div><div class="karya-desc">${k.desc}</div><span class="karya-type">${k.tipe}</span></div></div>`).join('')+
+      asArr(w.karya).map((k,i)=>`<div class="karya-item"><div class="karya-icon">${i+1}</div><div><div class="karya-name">${k.nama}</div><div class="karya-desc">${k.desc}</div><span class="karya-type">${k.tipe}</span></div></div>`).join('')+
       `</div>`;
   } else if(curDetTab===6){
     body.innerHTML=`<div class="sec-label">Peninggalan Bersejarah</div><div class="pening-list">`+
-      (w.peninggalan||[]).map(p=>`<div class="pening-item"><div class="pening-img"><img src="${p.img}" alt="${p.nama}" loading="lazy"></div><div class="pening-body"><div class="pening-name">${p.nama}</div><div class="pening-type">${p.tipe}</div></div></div>`).join('')+
+      asArr(w.peninggalan).map(p=>`<div class="pening-item"><div class="pening-img"><img src="${p.img}" alt="${p.nama}" loading="lazy"></div><div class="pening-body"><div class="pening-name">${p.nama}</div><div class="pening-type">${p.tipe}</div></div></div>`).join('')+
       `</div>`;
   } else if(curDetTab===7){
     body.innerHTML=`<div class="sec-label">Karomah & Kisah Luar Biasa</div><div class="karomah-list">`+
-      (w.karomah||[]).map(k=>`<div class="karomah-item"><div class="kar-icon">${k.icon}</div><div><div class="kar-title">${k.judul}</div><div class="kar-text">${k.text}</div></div></div>`).join('')+
+      asArr(w.karomah).map(k=>`<div class="karomah-item"><div class="kar-icon">${k.icon}</div><div><div class="kar-title">${k.judul}</div><div class="kar-text">${k.text}</div></div></div>`).join('')+
       `</div><div style="background:var(--amberl);border-radius:10px;padding:12px 14px;margin-top:4px"><div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:3px">⚠️ Catatan Penting</div><div style="font-size:11px;color:var(--amber);line-height:1.6">Kisah karomah ini bersumber dari tradisi lisan dan kitab manaqib. Harus disikapi dengan bijak — sebagai penambah keimanan, bukan sebagai keyakinan tanpa dasar.</div></div>`;
   } else if(curDetTab===8){
     const m=w.makam||{};
@@ -1301,7 +1309,7 @@ function renderDetTab(){
     </div>`;
   } else if(curDetTab===9){
     body.innerHTML=`<div class="sec-label">Galeri Foto</div><div class="galeri-grid">`+
-      (w.galeri||[]).map((g,i)=>`<div class="gal-item"><img src="${g}" alt="galeri ${i+1}" loading="lazy"><div class="gal-caption">Foto ${i+1}</div></div>`).join('')+
+      asArr(w.galeri).map((g,i)=>`<div class="gal-item"><img src="${g}" alt="galeri ${i+1}" loading="lazy"><div class="gal-caption">Foto ${i+1}</div></div>`).join('')+
       `</div>
       <button style="width:100%;margin-top:10px;background:var(--gl);color:var(--gd);border:0.5px solid var(--border);border-radius:12px;padding:10px;font-size:12px;font-weight:700;cursor:pointer" onclick="openAdminPanel('galeri')">+ Upload Foto Baru</button>`;
   }
@@ -1341,7 +1349,7 @@ function renderZiarah(){
       </div>
       <div class="zcard-body" id="zbody-${z.id}">
         <div class="zcard-text">${z.isi}</div>
-        <div class="ztips"><div class="ztips-title">✦ Tips Praktis:</div>${(z.tips||[]).map(t=>`<div class="ztip"><span>•</span><span>${t}</span></div>`).join('')}</div>
+        <div class="ztips"><div class="ztips-title">✦ Tips Praktis:</div>${asArr(z.tips).map(t=>`<div class="ztip"><span>•</span><span>${t}</span></div>`).join('')}</div>
       </div>
     </div>`).join('');
 }
@@ -1386,7 +1394,7 @@ function openAdminPanel(type){
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:var(--td)">${w.nama}</div>
           <div style="font-size:10px;color:var(--tmut)">${w.lokasi}</div>
-          <div style="display:flex;gap:3px;margin-top:4px">${(w.tags||[]).map(t=>`<span style="font-size:9px;background:var(--gl);color:var(--gd);padding:1px 5px;border-radius:3px;font-weight:700">${t}</span>`).join('')}</div>
+          <div style="display:flex;gap:3px;margin-top:4px">${asArr(w.tags).map(t=>`<span style="font-size:9px;background:var(--gl);color:var(--gd);padding:1px 5px;border-radius:3px;font-weight:700">${t}</span>`).join('')}</div>
         </div>
         <div style="display:flex;gap:6px">
           <button onclick="openWaliForm(${w.id})" style="background:var(--bluel);color:var(--blue);border:0.5px solid #BFDBFE;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">Edit</button>
@@ -1490,8 +1498,10 @@ function openAdminPanel(type){
     body.innerHTML=`<div style="text-align:center;padding:36px 16px;color:var(--tmut)">
       <div style="font-size:32px;margin-bottom:10px">⚠️</div>
       <div style="font-size:13px;font-weight:700;color:var(--td);margin-bottom:6px">Gagal memuat data</div>
-      <div style="font-size:12px;line-height:1.6">Terjadi kendala saat menampilkan data ini. Periksa koneksi database Anda, lalu coba lagi.</div>
-      <button class="btn-primary" style="margin-top:14px" onclick="openAdminPanel('${type}')">🔄 Coba Lagi</button>
+      <div style="font-size:12px;line-height:1.6;margin-bottom:10px">Terjadi kendala saat menampilkan data ini. Periksa koneksi database Anda, lalu coba lagi.</div>
+      <div style="text-align:left;background:var(--redl);border:0.5px solid #FECACA;border-radius:8px;padding:10px 12px;font-size:11px;color:var(--red);font-family:monospace;word-break:break-word;margin-bottom:4px">${(err && (err.stack||err.message||String(err))||'Unknown error').toString().slice(0,500)}</div>
+      <div style="font-size:10px;color:var(--tmut);margin-bottom:10px">↑ Salin pesan ini kalau mau ditanyakan</div>
+      <button class="btn-primary" style="margin-top:4px" onclick="openAdminPanel('${type}')">🔄 Coba Lagi</button>
     </div>`;
   }
 }
@@ -1531,9 +1541,9 @@ function openWaliForm(id){
   const w=id?DB.wali.find(x=>x.id===id):{};
   waliFormImg=w.img||'';
   waliFormMakamImg=(w.makam&&w.makam.img)||'';
-  waliFormPeninggalan=JSON.parse(JSON.stringify(w.peninggalan||[]));
-  waliFormGaleri=[...(w.galeri||[])];
-  waliFormTags=[...(w.tags||[])];
+  waliFormPeninggalan=JSON.parse(JSON.stringify(asArr(w.peninggalan)));
+  waliFormGaleri=[...asArr(w.galeri)];
+  waliFormTags=[...asArr(w.tags)];
   document.getElementById('wali-form-body').innerHTML=`
     <div class="field">
       <div class="flabel">Foto Utama Wali <span class="req">*</span></div>
@@ -1869,7 +1879,7 @@ function openZiarahForm(id){
       <div style="font-size:14px;font-weight:800;color:var(--td);margin-bottom:14px">${id?'Edit':'Tambah'} Panduan Ziarah</div>
       <div class="field"><div class="flabel">Judul Panduan <span class="req">*</span></div><input class="finput" id="zf-judul" value="${z.judul||''}"></div>
       <div class="field"><div class="flabel">Isi / Penjelasan <span class="req">*</span></div><textarea class="ftextarea" id="zf-isi" style="min-height:100px">${z.isi||''}</textarea></div>
-      <div class="field"><div class="flabel">Tips (pisahkan dengan Enter)</div><textarea class="ftextarea" id="zf-tips">${(z.tips||[]).join('\n')}</textarea></div>
+      <div class="field"><div class="flabel">Tips (pisahkan dengan Enter)</div><textarea class="ftextarea" id="zf-tips">${asArr(z.tips).join('\n')}</textarea></div>
       <div style="display:flex;gap:8px;margin-top:4px">
         <button class="btn-secondary" onclick="openAdminPanel('ziarah')">Batal</button>
         <button class="btn-primary" onclick="saveZiarah(${id||0})">💾 Simpan Panduan</button>
@@ -1994,15 +2004,30 @@ function toast(msg){
 function updateDbStatusBar(){
   const dot=document.getElementById('db-status-dot');
   const txt=document.getElementById('db-status-text');
+  const bar=document.getElementById('db-status-bar');
   if(!dot||!txt) return;
   if(dbConnected){
     dot.style.background='#16A34A';
     txt.style.color='#16A34A';
     txt.textContent='🟢 Tersambung ke Database (Google Sheets) — semua perubahan tersimpan otomatis';
+    if(bar) bar.style.flexDirection='row';
+    const old=document.getElementById('db-status-detail'); if(old) old.remove();
   } else {
     dot.style.background='var(--red)';
     txt.style.color='var(--red)';
-    txt.textContent='🔴 Mode Lokal — database belum disambungkan, lihat PANDUAN_SETUP_DATABASE.md';
+    txt.textContent=isApiConfigured()?'🔴 Gagal tersambung ke Database — perubahan hanya tersimpan sementara':'🔴 Mode Lokal — database belum disambungkan, lihat PANDUAN_SETUP_DATABASE.md';
+    if(bar && isApiConfigured() && lastApiError){
+      bar.style.flexDirection='column';
+      bar.style.alignItems='flex-start';
+      let detail=document.getElementById('db-status-detail');
+      if(!detail){
+        detail=document.createElement('div');
+        detail.id='db-status-detail';
+        detail.style.cssText='font-family:monospace;font-size:10px;color:var(--red);font-weight:400;word-break:break-word;margin-left:14px';
+        bar.appendChild(detail);
+      }
+      detail.textContent=lastApiError.toString().slice(0,300);
+    }
   }
 }
 
