@@ -539,6 +539,10 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
         <button class="admin-edit-btn" style="margin-left:0;background:transparent;color:#fff;border:0.5px solid rgba(255,255,255,0.5)" onclick="adminLogout()">🔒 Keluar</button>
       </div>
     </div>
+    <div id="db-status-bar" style="display:flex;align-items:center;gap:7px;padding:9px 16px;font-size:11px;font-weight:700;background:var(--cream);border-bottom:0.5px solid var(--border)">
+      <span id="db-status-dot" style="width:7px;height:7px;border-radius:50%;background:var(--tmut);flex-shrink:0"></span>
+      <span id="db-status-text" style="color:var(--tmut)">Memeriksa koneksi database...</span>
+    </div>
     <div class="admin-stats">
       <div class="astat"><div class="astat-n" id="a-wali">9</div><div class="astat-l">Wali</div></div>
       <div class="astat"><div class="astat-n" id="a-event">5</div><div class="astat-l">Event</div></div>
@@ -695,6 +699,16 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
 <div class="toast" id="toast"></div>
 
 <script>
+// ═══════════════════════════════════════
+// KONEKSI DATABASE (Google Sheets + Apps Script)
+// ═══════════════════════════════════════
+// Setelah deploy Apps Script (lihat PANDUAN_SETUP_DATABASE.md), tempel
+// URL Web App Anda di bawah ini (harus berakhiran "/exec").
+// Jika dibiarkan seperti ini, aplikasi tetap jalan memakai data bawaan
+// (mode offline/demo), tapi perubahan TIDAK akan tersimpan permanen.
+const API_URL = 'https://script.google.com/macros/s/AKfycbzCuQehrDA8cP7eh3DsYXD5F01JpMJAr8VP_MY7MLlw6XHP7mc_i8NQnxts0cPSW2v8/exec';
+let dbConnected = false;
+
 // ═══════════════════════════════════════
 // DATABASE
 // ═══════════════════════════════════════
@@ -908,6 +922,50 @@ let heroImg = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=760&h
 let eventFormImg = '';
 let deleteTarget = null;
 let openPanel = '';
+
+// ─── KONEKSI DATABASE (API ke Google Apps Script) ───
+function isApiConfigured(){
+  return !!API_URL && API_URL.indexOf('PASTE_') === -1;
+}
+async function apiGet(){
+  if(!isApiConfigured()) return null;
+  try{
+    const res = await fetch(API_URL + '?action=getAll');
+    const json = await res.json();
+    return (json && json.ok) ? json : null;
+  }catch(err){
+    console.error('Gagal mengambil data dari database:', err);
+    return null;
+  }
+}
+async function apiPost(action, payload){
+  if(!isApiConfigured()) return null;
+  try{
+    const res = await fetch(API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // hindari CORS preflight ke Apps Script
+      body: JSON.stringify(Object.assign({action:action}, payload))
+    });
+    return await res.json();
+  }catch(err){
+    console.error('Gagal menyimpan ke database ('+action+'):', err);
+    return null;
+  }
+}
+// Upload foto ke Google Drive lewat Apps Script; fallback ke base64 lokal
+// kalau database belum disambungkan atau upload gagal.
+async function uploadImageToDrive(base64, filename){
+  if(!isApiConfigured()) return base64;
+  try{
+    const mimeMatch = /^data:(.*?);base64,/.exec(base64);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const res = await apiPost('uploadImage', {base64:base64, filename:filename||('img_'+Date.now()+'.jpg'), mimeType:mimeType});
+    if(res && res.ok && res.result && res.result.url) return res.result.url;
+  }catch(err){
+    console.error('Upload foto gagal, pakai foto lokal sementara:', err);
+  }
+  return base64;
+}
 
 // ─── NAVIGATION ───
 function goScreen(name){
@@ -1517,25 +1575,31 @@ function addWaliTag(){
 }
 function removeWaliTag(t){waliFormTags=waliFormTags.filter(x=>x!==t);document.getElementById('wf-tags').innerHTML=renderTagChips();}
 
-function handleWaliImg(ev){
+async function handleWaliImg(ev){
   const file=ev.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    waliFormImg=e.target.result;
+  reader.onload=async e=>{
+    const localPreview=e.target.result;
+    waliFormImg=localPreview;
     const wrap=document.getElementById('wali-img-wrap');
-    wrap.innerHTML=`<img class="preview" src="${waliFormImg}" alt="preview" style="width:100%;max-height:160px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Foto</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleWaliImg(event)">`;
-    toast('✅ Foto berhasil dipilih');
+    wrap.innerHTML=`<img class="preview" src="${localPreview}" alt="preview" style="width:100%;max-height:160px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Foto</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleWaliImg(event)">`;
+    toast(dbConnected?'⏳ Mengunggah foto...':'✅ Foto berhasil dipilih');
+    waliFormImg = await uploadImageToDrive(localPreview, 'wali_'+Date.now()+'.jpg');
+    if(dbConnected) toast('✅ Foto tersimpan');
   };
   reader.readAsDataURL(file);
 }
-function handleMakamImg(ev){
+async function handleMakamImg(ev){
   const file=ev.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    waliFormMakamImg=e.target.result;
+  reader.onload=async e=>{
+    const localPreview=e.target.result;
+    waliFormMakamImg=localPreview;
     const wrap=document.getElementById('makam-img-wrap');
-    wrap.innerHTML=`<img class="preview" src="${waliFormMakamImg}" alt="makam" style="width:100%;max-height:120px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleMakamImg(event)">`;
-    toast('✅ Foto makam dipilih — klik Simpan untuk menerapkan');
+    wrap.innerHTML=`<img class="preview" src="${localPreview}" alt="makam" style="width:100%;max-height:120px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleMakamImg(event)">`;
+    toast(dbConnected?'⏳ Mengunggah foto makam...':'✅ Foto makam dipilih — klik Simpan untuk menerapkan');
+    waliFormMakamImg = await uploadImageToDrive(localPreview, 'makam_'+Date.now()+'.jpg');
+    if(dbConnected) toast('✅ Foto makam tersimpan — klik Simpan untuk menerapkan');
   };
   reader.readAsDataURL(file);
 }
@@ -1565,13 +1629,17 @@ function removePeninggalanItem(i){
   waliFormPeninggalan.splice(i,1);
   renderPeninggalanList();
 }
-function handlePeninggalanImg(ev,i){
+async function handlePeninggalanImg(ev,i){
   const file=ev.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    waliFormPeninggalan[i].img=e.target.result;
+  reader.onload=async e=>{
+    const localPreview=e.target.result;
+    waliFormPeninggalan[i].img=localPreview;
     renderPeninggalanList();
-    toast('✅ Foto peninggalan diperbarui');
+    toast(dbConnected?'⏳ Mengunggah foto peninggalan...':'✅ Foto peninggalan diperbarui');
+    const url = await uploadImageToDrive(localPreview, 'peninggalan_'+Date.now()+'.jpg');
+    if(waliFormPeninggalan[i]){ waliFormPeninggalan[i].img=url; renderPeninggalanList(); }
+    if(dbConnected) toast('✅ Foto peninggalan tersimpan');
   };
   reader.readAsDataURL(file);
 }
@@ -1584,13 +1652,18 @@ function renderGaleriGrid(){
     <div class="gf-thumb"><img src="${g}" alt="foto ${i+1}"><div class="gf-remove" onclick="removeGaleriPhoto(${i})">×</div></div>`).join('') +
     `<div class="gf-add"><span>+</span><input type="file" accept="image/*" onchange="handleGaleriAdd(event)"></div>`;
 }
-function handleGaleriAdd(ev){
+async function handleGaleriAdd(ev){
   const file=ev.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    waliFormGaleri.push(e.target.result);
+  reader.onload=async e=>{
+    const localPreview=e.target.result;
+    const idx=waliFormGaleri.length;
+    waliFormGaleri.push(localPreview);
     renderGaleriGrid();
-    toast('✅ Foto ditambahkan ke galeri');
+    toast(dbConnected?'⏳ Mengunggah foto galeri...':'✅ Foto ditambahkan ke galeri');
+    const url = await uploadImageToDrive(localPreview, 'galeri_'+Date.now()+'.jpg');
+    if(waliFormGaleri[idx]===localPreview){ waliFormGaleri[idx]=url; renderGaleriGrid(); }
+    if(dbConnected) toast('✅ Foto galeri tersimpan');
   };
   reader.readAsDataURL(file);
 }
@@ -1604,23 +1677,30 @@ function handleGaleriUpload(ev){
   toast('✅ Foto berhasil diupload ke galeri');
 }
 
-function handleHeroImg(ev){
+async function handleHeroImg(ev){
   const file=ev.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    heroImg=e.target.result;
+  reader.onload=async e=>{
+    const localPreview=e.target.result;
+    heroImg=localPreview;
     const wrap=document.getElementById('hero-img-wrap');
-    if(wrap) wrap.innerHTML=`<img class="preview" src="${heroImg}" alt="hero banner" style="width:100%;max-height:170px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Banner</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleHeroImg(event)">`;
+    if(wrap) wrap.innerHTML=`<img class="preview" src="${localPreview}" alt="hero banner" style="width:100%;max-height:170px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Banner</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleHeroImg(event)">`;
     const heroEl=document.getElementById('hero-banner-img');
+    if(heroEl) heroEl.src=localPreview;
+    toast(dbConnected?'⏳ Mengunggah banner...':'✅ Banner beranda berhasil diperbarui!');
+    heroImg = await uploadImageToDrive(localPreview, 'hero_'+Date.now()+'.jpg');
     if(heroEl) heroEl.src=heroImg;
-    toast('✅ Banner beranda berhasil diperbarui!');
+    if(dbConnected){
+      await apiPost('saveSettings', {data:{heroImg:heroImg}});
+      toast('✅ Banner tersimpan ke database');
+    }
   };
   reader.readAsDataURL(file);
 }
 
 function closeWaliForm(){document.getElementById('wali-form-overlay').classList.remove('open');}
 
-function saveWali(){
+async function saveWali(){
   const nama=(document.getElementById('wf-nama')||{value:''}).value.trim();
   const lokasi=(document.getElementById('wf-lokasi')||{value:''}).value.trim();
   if(!nama||!lokasi){toast('⚠️ Nama dan Lokasi wajib diisi!');return;}
@@ -1646,12 +1726,17 @@ function saveWali(){
   if(waliEditId){
     const idx=DB.wali.findIndex(x=>x.id===waliEditId);
     if(idx>=0) DB.wali[idx]={...DB.wali[idx],...data};
-    toast('✅ Data wali berhasil diperbarui!');
+    toast(dbConnected?'⏳ Menyimpan ke database...':'✅ Data wali berhasil diperbarui!');
   } else {
     const newId=Math.max(...DB.wali.map(w=>w.id))+1;
     DB.wali.push({id:newId,...data});
     savedId=newId;
-    toast('✅ Wali baru berhasil ditambahkan!');
+    toast(dbConnected?'⏳ Menyimpan ke database...':'✅ Wali baru berhasil ditambahkan!');
+  }
+  if(dbConnected){
+    const res=await apiPost('saveWali', {data:Object.assign({id:savedId}, data)});
+    if(res&&res.ok){ toast('✅ Data wali tersimpan ke database!'); }
+    else { toast('⚠️ Gagal menyimpan ke database, perubahan hanya tersimpan sementara.'); }
   }
   closeWaliForm();
   renderAdmin();
@@ -1702,19 +1787,22 @@ function openEventForm(id){
   document.getElementById('admin-panel-footer').innerHTML='';
 }
 
-function handleEvtImg(ev){
+async function handleEvtImg(ev){
   const file=ev.target.files[0];if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    eventFormImg=e.target.result;
+  reader.onload=async e=>{
+    const localPreview=e.target.result;
+    eventFormImg=localPreview;
     const w=document.getElementById('evt-img-wrap');
-    w.innerHTML=`<img class="preview" src="${eventFormImg}" style="width:100%;height:120px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleEvtImg(event)">`;
-    toast('✅ Foto event dipilih — klik Simpan untuk menerapkan');
+    w.innerHTML=`<img class="preview" src="${localPreview}" style="width:100%;height:120px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleEvtImg(event)">`;
+    toast(dbConnected?'⏳ Mengunggah foto event...':'✅ Foto event dipilih — klik Simpan untuk menerapkan');
+    eventFormImg = await uploadImageToDrive(localPreview, 'event_'+Date.now()+'.jpg');
+    if(dbConnected) toast('✅ Foto event tersimpan — klik Simpan untuk menerapkan');
   };
   reader.readAsDataURL(file);
 }
 
-function saveEvent(id){
+async function saveEvent(id){
   const judul=(document.getElementById('ef-judul')||{value:''}).value.trim();
   if(!judul){toast('⚠️ Judul wajib diisi!');return;}
   const data={
@@ -1728,14 +1816,20 @@ function saveEvent(id){
     deskripsi:(document.getElementById('ef-desc')||{value:''}).value.trim(),
     img:eventFormImg||IMGS.event[Math.floor(Math.random()*IMGS.event.length)]
   };
+  let savedId=id;
   if(id){
     const idx=DB.events.findIndex(x=>x.id===id);
     if(idx>=0) DB.events[idx]={...DB.events[idx],...data};
-    toast('✅ Event berhasil diperbarui!');
+    toast(dbConnected?'⏳ Menyimpan event...':'✅ Event berhasil diperbarui!');
   } else {
     const newId=Math.max(...DB.events.map(e=>e.id))+1;
     DB.events.push({id:newId,...data});
-    toast('✅ Event baru ditambahkan!');
+    savedId=newId;
+    toast(dbConnected?'⏳ Menyimpan event...':'✅ Event baru ditambahkan!');
+  }
+  if(dbConnected){
+    const res=await apiPost('saveEvent', {data:Object.assign({id:savedId}, data)});
+    toast(res&&res.ok?'✅ Event tersimpan ke database!':'⚠️ Gagal menyimpan ke database.');
   }
   openAdminPanel('event');
   renderAdmin();
@@ -1761,19 +1855,25 @@ function openZiarahForm(id){
   document.getElementById('admin-panel-footer').innerHTML='';
 }
 
-function saveZiarah(id){
+async function saveZiarah(id){
   const judul=(document.getElementById('zf-judul')||{value:''}).value.trim();
   const isi=(document.getElementById('zf-isi')||{value:''}).value.trim();
   if(!judul||!isi){toast('⚠️ Judul dan Isi wajib diisi!');return;}
   const tips=(document.getElementById('zf-tips')||{value:''}).value.split('\n').map(t=>t.trim()).filter(Boolean);
+  let savedId=id;
   if(id){
     const idx=DB.ziarah.findIndex(x=>x.id===id);
     if(idx>=0) DB.ziarah[idx]={...DB.ziarah[idx],judul,isi,tips};
-    toast('✅ Panduan berhasil diperbarui!');
+    toast(dbConnected?'⏳ Menyimpan panduan...':'✅ Panduan berhasil diperbarui!');
   } else {
     const newId=Math.max(...DB.ziarah.map(z=>z.id))+1;
     DB.ziarah.push({id:newId,judul,isi,tips});
-    toast('✅ Panduan baru ditambahkan!');
+    savedId=newId;
+    toast(dbConnected?'⏳ Menyimpan panduan...':'✅ Panduan baru ditambahkan!');
+  }
+  if(dbConnected){
+    const res=await apiPost('saveZiarah', {data:{id:savedId,judul,isi,tips}});
+    toast(res&&res.ok?'✅ Panduan tersimpan ke database!':'⚠️ Gagal menyimpan ke database.');
   }
   openAdminPanel('ziarah');
   renderAdmin();
@@ -1809,20 +1909,25 @@ function askDeleteZiarah(id){
   document.getElementById('conf-btn').onclick=confirmDelete;
   document.getElementById('confirm-overlay').classList.add('open');
 }
-function confirmDelete(){
+async function confirmDelete(){
   if(!deleteTarget) return;
-  if(deleteTarget.type==='wali') DB.wali=DB.wali.filter(x=>x.id!==deleteTarget.id);
-  if(deleteTarget.type==='event') DB.events=DB.events.filter(x=>x.id!==deleteTarget.id);
-  if(deleteTarget.type==='ziarah') DB.ziarah=DB.ziarah.filter(x=>x.id!==deleteTarget.id);
+  const type=deleteTarget.type, id=deleteTarget.id;
+  if(type==='wali') DB.wali=DB.wali.filter(x=>x.id!==id);
+  if(type==='event') DB.events=DB.events.filter(x=>x.id!==id);
+  if(type==='ziarah') DB.ziarah=DB.ziarah.filter(x=>x.id!==id);
   closeConfirm();
-  toast('🗑️ Data berhasil dihapus');
+  toast(dbConnected?'⏳ Menghapus dari database...':'🗑️ Data berhasil dihapus');
   if(openPanel) openAdminPanel(openPanel);
   renderAdmin();
   // langsung perbarui semua halaman publik yang terdampak tanpa perlu reload
-  if(deleteTarget.type==='wali'){ renderHome(); renderDir(); if(curWali&&curWali.id===deleteTarget.id){ curWali=null; goScreen('direktori'); } }
-  if(deleteTarget.type==='event'){ renderEvents(); if(document.getElementById('home-event-list')) renderHome(); }
-  if(deleteTarget.type==='ziarah'){ renderZiarah(); }
-  deleteTarget=null;
+  if(type==='wali'){ renderHome(); renderDir(); if(curWali&&curWali.id===id){ curWali=null; goScreen('direktori'); } }
+  if(type==='event'){ renderEvents(); if(document.getElementById('home-event-list')) renderHome(); }
+  if(type==='ziarah'){ renderZiarah(); }
+  if(dbConnected){
+    const actionName = type==='wali'?'deleteWali':(type==='event'?'deleteEvent':'deleteZiarah');
+    const res=await apiPost(actionName, {id:id});
+    toast(res&&res.ok?'🗑️ Data berhasil dihapus dari database':'⚠️ Gagal menghapus dari database.');
+  }
 }
 function closeConfirm(){document.getElementById('confirm-overlay').classList.remove('open');deleteTarget=null;}
 
@@ -1863,13 +1968,56 @@ function toast(msg){
   setTimeout(()=>t.className='toast',2500);
 }
 
+function updateDbStatusBar(){
+  const dot=document.getElementById('db-status-dot');
+  const txt=document.getElementById('db-status-text');
+  if(!dot||!txt) return;
+  if(dbConnected){
+    dot.style.background='#16A34A';
+    txt.style.color='#16A34A';
+    txt.textContent='🟢 Tersambung ke Database (Google Sheets) — semua perubahan tersimpan otomatis';
+  } else {
+    dot.style.background='var(--red)';
+    txt.style.color='var(--red)';
+    txt.textContent='🔴 Mode Lokal — database belum disambungkan, lihat PANDUAN_SETUP_DATABASE.md';
+  }
+}
+
 // ─── INIT ───
-renderHome();
-renderDir();
-renderEvents();
-renderZiarah();
-renderAdmin();
-renderQuote();
-setInterval(rotateQuote,5000);
+async function initApp(){
+  const remote = await apiGet();
+  if(remote){
+    dbConnected = true;
+    const hasData = (remote.wali && remote.wali.length) || (remote.events && remote.events.length) || (remote.ziarah && remote.ziarah.length);
+    if(hasData){
+      // database sudah berisi data -> jadikan sumber data utama aplikasi
+      if(remote.wali && remote.wali.length) DB.wali = remote.wali;
+      if(remote.events && remote.events.length) DB.events = remote.events;
+      if(remote.ziarah && remote.ziarah.length) DB.ziarah = remote.ziarah;
+      if(remote.settings){
+        if(remote.settings.heroImg) heroImg = remote.settings.heroImg;
+        if(remote.settings.adminName) adminName = remote.settings.adminName;
+        if(remote.settings.adminRole) adminRole = remote.settings.adminRole;
+      }
+    } else {
+      // database masih kosong -> kirim data bawaan sekali untuk mengisi sheet
+      await apiPost('seedInitialData', {data:{
+        wali: DB.wali, events: DB.events, ziarah: DB.ziarah,
+        settings: {heroImg: heroImg, adminName: adminName, adminRole: adminRole}
+      }});
+    }
+  } else {
+    console.warn('Mode offline: database belum disambungkan. Lihat PANDUAN_SETUP_DATABASE.md / variabel API_URL.');
+  }
+  updateDbStatusBar();
+  renderHome();
+  renderDir();
+  renderEvents();
+  renderZiarah();
+  renderAdmin();
+  renderQuote();
+  setInterval(rotateQuote,5000);
+}
+initApp();
 </script>
 </html>
