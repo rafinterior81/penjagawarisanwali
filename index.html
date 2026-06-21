@@ -706,7 +706,7 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
 // URL Web App Anda di bawah ini (harus berakhiran "/exec").
 // Jika dibiarkan seperti ini, aplikasi tetap jalan memakai data bawaan
 // (mode offline/demo), tapi perubahan TIDAK akan tersimpan permanen.
-const API_URL = 'https://script.google.com/macros/s/AKfycbzCuQehrDA8cP7eh3DsYXD5F01JpMJAr8VP_MY7MLlw6XHP7mc_i8NQnxts0cPSW2v8/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxHn1HazjDk7A-RDiy5I8wnxpx5w1AEQgVMoyuJQbRzlIAFRlEQIpmZlhBAB1G-93WL/exec';
 let dbConnected = false;
 
 // ═══════════════════════════════════════
@@ -929,25 +929,38 @@ function isApiConfigured(){
 }
 async function apiGet(){
   if(!isApiConfigured()) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 12000);
   try{
-    const res = await fetch(API_URL + '?action=getAll');
+    const res = await fetch(API_URL + '?action=getAll', {signal: controller.signal});
+    clearTimeout(timeoutId);
     const json = await res.json();
-    return (json && json.ok) ? json : null;
+    if(json && json.ok) return json;
+    console.error('Database merespons dengan error:', json && json.error);
+    return null;
   }catch(err){
-    console.error('Gagal mengambil data dari database:', err);
+    clearTimeout(timeoutId);
+    console.error('Gagal mengambil data dari database (cek API_URL & status deployment Apps Script):', err);
     return null;
   }
 }
 async function apiPost(action, payload){
   if(!isApiConfigured()) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 15000);
   try{
     const res = await fetch(API_URL, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'}, // hindari CORS preflight ke Apps Script
-      body: JSON.stringify(Object.assign({action:action}, payload))
+      body: JSON.stringify(Object.assign({action:action}, payload)),
+      signal: controller.signal
     });
-    return await res.json();
+    clearTimeout(timeoutId);
+    const json = await res.json();
+    if(!json || json.ok===false) console.error('Database merespons dengan error ('+action+'):', json && json.error);
+    return json;
   }catch(err){
+    clearTimeout(timeoutId);
     console.error('Gagal menyimpan ke database ('+action+'):', err);
     return null;
   }
@@ -1354,13 +1367,16 @@ function renderAdmin(){
 // ─── ADMIN PANELS ───
 function openAdminPanel(type){
   openPanel=type;
+  // tampilkan panelnya DULU, baru isi kontennya — supaya panel selalu kebuka
+  // walau ada masalah saat menyiapkan datanya
+  document.getElementById('admin-overlay').classList.add('open');
   const titles={wali:'Kelola Data Wali',event:'Kelola Event & Haul',ziarah:'Kelola Pedoman Ziarah',galeri:'Kelola Galeri Foto',pengguna:'Kelola Pengguna',laporan:'Laporan & Statistik',beranda:'Banner Beranda'};
   document.getElementById('admin-panel-title').textContent=titles[type]||type;
   const body=document.getElementById('admin-panel-body');
   const footer=document.getElementById('admin-panel-footer');
   footer.innerHTML='';
-
-  if(type==='wali'){
+  try{
+    if(type==='wali'){
     body.innerHTML=`
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button class="btn-primary" style="flex:0;padding:8px 16px;font-size:12px" onclick="openWaliForm(null)">+ Tambah Wali Baru</button>
@@ -1469,8 +1485,15 @@ function openAdminPanel(type){
         <div style="font-size:12px;font-weight:700;color:var(--gd)">${Math.floor(Math.random()*900+100)} views</div>
       </div>`).join('')}`;
   }
-
-  document.getElementById('admin-overlay').classList.add('open');
+  }catch(err){
+    console.error('Gagal menampilkan panel admin ('+type+'):', err);
+    body.innerHTML=`<div style="text-align:center;padding:36px 16px;color:var(--tmut)">
+      <div style="font-size:32px;margin-bottom:10px">⚠️</div>
+      <div style="font-size:13px;font-weight:700;color:var(--td);margin-bottom:6px">Gagal memuat data</div>
+      <div style="font-size:12px;line-height:1.6">Terjadi kendala saat menampilkan data ini. Periksa koneksi database Anda, lalu coba lagi.</div>
+      <button class="btn-primary" style="margin-top:14px" onclick="openAdminPanel('${type}')">🔄 Coba Lagi</button>
+    </div>`;
+  }
 }
 
 function closeAdminPanel(){
@@ -1984,31 +2007,25 @@ function updateDbStatusBar(){
 }
 
 // ─── INIT ───
+function sanitizeWaliList(list){
+  if(!Array.isArray(list)) return null;
+  const clean = list.filter(w => w && w.id!=null && !isNaN(Number(w.id)) && w.nama);
+  return clean.length ? clean : null;
+}
+function sanitizeEventList(list){
+  if(!Array.isArray(list)) return null;
+  const clean = list.filter(e => e && e.id!=null && !isNaN(Number(e.id)) && e.judul).map(e=>Object.assign({},e,{id:Number(e.id),tipe:e.tipe||'haul'}));
+  return clean.length ? clean : null;
+}
+function sanitizeZiarahList(list){
+  if(!Array.isArray(list)) return null;
+  const clean = list.filter(z => z && z.id!=null && !isNaN(Number(z.id)) && z.judul).map(z=>Object.assign({},z,{id:Number(z.id),tips:Array.isArray(z.tips)?z.tips:[]}));
+  return clean.length ? clean : null;
+}
+
 async function initApp(){
-  const remote = await apiGet();
-  if(remote){
-    dbConnected = true;
-    const hasData = (remote.wali && remote.wali.length) || (remote.events && remote.events.length) || (remote.ziarah && remote.ziarah.length);
-    if(hasData){
-      // database sudah berisi data -> jadikan sumber data utama aplikasi
-      if(remote.wali && remote.wali.length) DB.wali = remote.wali;
-      if(remote.events && remote.events.length) DB.events = remote.events;
-      if(remote.ziarah && remote.ziarah.length) DB.ziarah = remote.ziarah;
-      if(remote.settings){
-        if(remote.settings.heroImg) heroImg = remote.settings.heroImg;
-        if(remote.settings.adminName) adminName = remote.settings.adminName;
-        if(remote.settings.adminRole) adminRole = remote.settings.adminRole;
-      }
-    } else {
-      // database masih kosong -> kirim data bawaan sekali untuk mengisi sheet
-      await apiPost('seedInitialData', {data:{
-        wali: DB.wali, events: DB.events, ziarah: DB.ziarah,
-        settings: {heroImg: heroImg, adminName: adminName, adminRole: adminRole}
-      }});
-    }
-  } else {
-    console.warn('Mode offline: database belum disambungkan. Lihat PANDUAN_SETUP_DATABASE.md / variabel API_URL.');
-  }
+  // render dulu pakai data bawaan supaya aplikasi LANGSUNG bisa dipakai,
+  // tidak menunggu proses sambung ke database (yang bisa lambat/gagal)
   updateDbStatusBar();
   renderHome();
   renderDir();
@@ -2017,6 +2034,48 @@ async function initApp(){
   renderAdmin();
   renderQuote();
   setInterval(rotateQuote,5000);
+
+  // baru setelah itu coba sambungkan ke database di latar belakang
+  try{
+    const remote = await apiGet();
+    if(remote){
+      dbConnected = true;
+      const cleanWali = sanitizeWaliList(remote.wali);
+      const cleanEvents = sanitizeEventList(remote.events);
+      const cleanZiarah = sanitizeZiarahList(remote.ziarah);
+      const hasData = cleanWali || cleanEvents || cleanZiarah;
+      if(hasData){
+        // database sudah berisi data valid -> jadikan sumber data utama aplikasi
+        if(cleanWali) DB.wali = cleanWali;
+        if(cleanEvents) DB.events = cleanEvents;
+        if(cleanZiarah) DB.ziarah = cleanZiarah;
+        if(remote.settings){
+          if(remote.settings.heroImg) heroImg = remote.settings.heroImg;
+          if(remote.settings.adminName) adminName = remote.settings.adminName;
+          if(remote.settings.adminRole) adminRole = remote.settings.adminRole;
+        }
+      } else {
+        // database masih kosong/tidak valid -> kirim data bawaan sekali untuk mengisi sheet
+        await apiPost('seedInitialData', {data:{
+          wali: DB.wali, events: DB.events, ziarah: DB.ziarah,
+          settings: {heroImg: heroImg, adminName: adminName, adminRole: adminRole}
+        }});
+      }
+    } else {
+      console.warn('Mode offline: database belum disambungkan. Lihat PANDUAN_SETUP_DATABASE.md / variabel API_URL.');
+    }
+  }catch(err){
+    console.error('Gagal menyambungkan ke database, aplikasi tetap berjalan dengan data lokal:', err);
+    dbConnected = false;
+  }
+  // render ulang dengan data terbaru (kalau ada perubahan dari database) +
+  // perbarui badge status koneksi
+  updateDbStatusBar();
+  renderHome();
+  renderDir();
+  renderEvents();
+  renderZiarah();
+  renderAdmin();
 }
 initApp();
 </script>
