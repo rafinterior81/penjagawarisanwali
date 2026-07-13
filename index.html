@@ -232,6 +232,29 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
 .makam-btn.secondary{background:var(--gl);color:var(--gd);border:0.5px solid var(--border)}
 
 .galeri-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+/* ── GALERI SLIDER ── */
+.slider-outer{position:relative;user-select:none}
+.slider-wrap{overflow:hidden;border-radius:12px;background:var(--cream)}
+.slider-track{display:flex;transition:transform .36s cubic-bezier(.4,0,.2,1);will-change:transform}
+.slider-slide{flex:0 0 50%;width:50%;padding:4px;box-sizing:border-box}
+.slider-slide img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:9px;display:block;cursor:pointer}
+.slider-caption{font-size:10px;color:var(--tmut);text-align:center;margin-top:3px;line-height:1.3;padding:0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slider-nav{display:flex;align-items:center;gap:6px;padding:8px 2px 2px}
+.slider-btn{width:30px;height:30px;border:none;border-radius:50%;background:var(--gd);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;padding:0;transition:opacity .15s}
+.slider-btn:disabled{opacity:.22;cursor:default}
+.slider-dots{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;flex:1}
+.slider-dot{width:6px;height:6px;border-radius:50%;background:var(--border);cursor:pointer;transition:background .2s,transform .2s}
+.slider-dot.active{background:var(--gd);transform:scale(1.45)}
+.slider-counter{font-size:10px;font-weight:700;color:var(--tmut);white-space:nowrap}
+.galeri-empty{text-align:center;padding:36px 20px;color:var(--tmut);font-size:12px;line-height:1.8}
+/* Admin galeri upload grid */
+.adm-galeri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+.adm-galeri-cell{position:relative;border-radius:9px;overflow:hidden;aspect-ratio:1/1;background:var(--cream);border:0.5px solid var(--border)}
+.adm-galeri-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.adm-galeri-del{position:absolute;top:4px;right:4px;background:rgba(220,38,38,.88);border:none;border-radius:5px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:800;color:#fff;line-height:1}
+.adm-galeri-add{display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px}
+.adm-galeri-add svg{width:22px;height:22px;color:var(--gd);opacity:.6}
+.adm-galeri-add span{font-size:9px;color:var(--tmut);font-weight:600}
 .gal-item{border-radius:12px;overflow:hidden;position:relative;cursor:pointer}
 .gal-item img{width:100%;height:100px;object-fit:cover;display:block}
 .gal-item:first-child{grid-column:1/-1}
@@ -412,10 +435,10 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
       </div>
     </div>
     <div class="stats-bar">
-      <div class="stat-item"><div class="stat-num">9</div><div class="stat-label">Wali Songo</div></div>
-      <div class="stat-item"><div class="stat-num">34</div><div class="stat-label">Data Makam</div></div>
-      <div class="stat-item"><div class="stat-num">120+</div><div class="stat-label">Ajaran</div></div>
-      <div class="stat-item"><div class="stat-num">5K+</div><div class="stat-label">Peziarah</div></div>
+      <div class="stat-item"><div class="stat-num" id="hs-wali">—</div><div class="stat-label">Wali Tercatat</div></div>
+      <div class="stat-item"><div class="stat-num" id="hs-makam">—</div><div class="stat-label">Data Makam</div></div>
+      <div class="stat-item"><div class="stat-num" id="hs-ajaran">—</div><div class="stat-label">Ajaran</div></div>
+      <div class="stat-item"><div class="stat-num" id="hs-event">—</div><div class="stat-label">Event Haul</div></div>
     </div>
     <div class="section">
       <div class="sec-hd">
@@ -594,6 +617,12 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
           <div class="amenu-desc">Statistik & data</div>
           <div class="amenu-badge">Baru</div>
         </div>
+        <div class="amenu-item" onclick="openAdminPanel('csv')">
+          <div class="amenu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></div>
+          <div class="amenu-name">Import CSV</div>
+          <div class="amenu-desc">Upload & sinkronkan</div>
+          <div class="amenu-badge" id="csv-badge">Wali · Event · Ziarah</div>
+        </div>
       </div>
     </div>
     <div class="admin-activity">
@@ -703,12 +732,58 @@ html,body{width:380px;margin:0 auto;background:#e5e7eb;min-height:100vh;display:
 // KONEKSI DATABASE (Google Sheets + Apps Script)
 // ═══════════════════════════════════════
 // Setelah deploy Apps Script (lihat PANDUAN_SETUP_DATABASE.md), tempel
-// URL Web App Anda di bawah ini (harus berakhiran "/exec").
-// Jika dibiarkan seperti ini, aplikasi tetap jalan memakai data bawaan
-// (mode offline/demo), tapi perubahan TIDAK akan tersimpan permanen.
-const API_URL = 'https://script.google.com/macros/s/AKfycbyl2rRCmj7OB6Q-XHLlfIIa8QiZRVXYp-m7SFwZWNscTSapYvhfxQY4GAL-yCUGBj8I/exec';
+// ═══ SUPABASE CONFIG ═══════════════════════════════
+const SB_URL = 'https://ojghtpzgzkasoatwyoxm.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZ2h0cHpnemthc29hdHd5b3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MDcyNjYsImV4cCI6MjA5OTI4MzI2Nn0.q5ZFNJj8EAcGBsKYCP554_QEN4BeZbfE1ZMRTCorVNU';
 let dbConnected = false;
 let lastApiError = '';
+
+const SB_HEADERS = {
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
+
+async function sbGet(table, select='*'){
+  try{
+    const r = await fetch(SB_URL+'/rest/v1/'+table+'?select='+encodeURIComponent(select)+'&order=id.asc', {headers: SB_HEADERS});
+    if(!r.ok){ lastApiError='HTTP '+r.status+' pada GET '+table; return null; }
+    return await r.json();
+  }catch(e){ lastApiError=String(e); return null; }
+}
+
+async function sbUpsert(table, data){
+  try{
+    const h = Object.assign({}, SB_HEADERS, {'Prefer':'return=representation,resolution=merge-duplicates'});
+    const r = await fetch(SB_URL+'/rest/v1/'+table, {method:'POST',headers:h,body:JSON.stringify(data)});
+    if(!r.ok){ const t=await r.text(); lastApiError='HTTP '+r.status+' pada upsert '+table+': '+t.slice(0,200); return null; }
+    return await r.json();
+  }catch(e){ lastApiError=String(e); return null; }
+}
+
+async function sbDelete(table, id){
+  try{
+    const r = await fetch(SB_URL+'/rest/v1/'+table+'?id=eq.'+id, {method:'DELETE',headers:SB_HEADERS});
+    return r.ok;
+  }catch(e){ lastApiError=String(e); return false; }
+}
+
+async function sbSettingGet(key){
+  try{
+    const r = await fetch(SB_URL+'/rest/v1/pw_settings?key=eq.'+encodeURIComponent(key), {headers:SB_HEADERS});
+    if(!r.ok) return null;
+    const rows = await r.json();
+    return rows && rows[0] ? rows[0].value : null;
+  }catch(e){ return null; }
+}
+
+async function sbSettingSet(key, value){
+  const h = Object.assign({}, SB_HEADERS, {'Prefer':'return=representation,resolution=merge-duplicates'});
+  try{
+    await fetch(SB_URL+'/rest/v1/pw_settings', {method:'POST',headers:h,body:JSON.stringify({key,value,updated_at:new Date().toISOString()})});
+  }catch(e){}
+}
 
 // ═══════════════════════════════════════
 // DATABASE
@@ -924,71 +999,420 @@ let eventFormImg = '';
 let deleteTarget = null;
 let openPanel = '';
 
+// Galeri foto global (dikumpulkan dari semua upload admin)
+let GALLERY_PHOTOS = []; // [{id, src, caption, waliId}]
+let sliderIdx = 0;
+
 // ─── KONEKSI DATABASE (API ke Google Apps Script) ───
 // Pastikan field yang seharusnya array (tags, tips, dll) selalu berupa array,
 // walau data dari sheet ternyata rusak/berupa teks biasa — supaya .map()/.join()
 // tidak pernah membuat aplikasi error.
 function asArr(v){ return Array.isArray(v) ? v : (v ? [v] : []); }
 
-function isApiConfigured(){
-  return !!API_URL && API_URL.indexOf('PASTE_') === -1;
-}
-async function apiGet(){
-  if(!isApiConfigured()) return null;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(()=>controller.abort(), 12000);
-  try{
-    const res = await fetch(API_URL + '?action=getAll', {signal: controller.signal});
-    clearTimeout(timeoutId);
-    const json = await res.json();
-    if(json && json.ok) return json;
-    lastApiError = 'Database merespons dengan error: '+(json && json.error);
-    console.error(lastApiError);
-    return null;
-  }catch(err){
-    clearTimeout(timeoutId);
-    lastApiError = String(err && (err.message||err));
-    console.error('Gagal mengambil data dari database (cek API_URL & status deployment Apps Script):', err);
-    return null;
+// (foto disimpan sebagai base64 di Supabase settings atau URL eksternal)
+
+
+
+// ═══════════════════════════════════════════════════
+// CSV IMPORT ENGINE
+// ═══════════════════════════════════════════════════
+let csvCurrentTab = 'wali';
+let csvParsedRows  = [];
+
+// Definisi kolom valid tiap tipe — dipakai untuk validasi & template
+const CSV_SCHEMA = {
+  wali: {
+    required: ['nama','lokasi'],
+    optional: ['asli','img','wilayah','asal','lahir','wafat','dakwah','peran','bio',
+                'tags','nasab','keluarga','murid','ajaran','karya','karomah',
+                'peninggalan','galeri','makam_nama','makam_alamat','makam_maps'],
+    desc: 'Data profil wali / ulama',
+    jsonFields: ['tags','nasab','keluarga','murid','ajaran','karya','karomah','peninggalan','galeri'],
+    example: {
+      nama:'Sunan Ampel', asli:'Raden Rahmat', lokasi:'Surabaya, Jawa Timur',
+      wilayah:'Jawa Timur', asal:'Champa (Kamboja)', lahir:'1401', wafat:'1481',
+      dakwah:'Jawa Timur', peran:'Pendiri pesantren pertama di Jawa',
+      bio:'Wali yang berdakwah melalui pendidikan pesantren.',
+      tags:'["Pendidikan","Pesantren","Jawa Timur"]',
+      makam_nama:'Makam Sunan Ampel', makam_alamat:'Jl. Ampel, Surabaya',
+      makam_maps:'https://maps.google.com/?q=Makam+Sunan+Ampel'
+    }
+  },
+  event: {
+    required: ['judul','tanggal','bulan','tahun','lokasi'],
+    optional: ['tipe','waktu','img','deskripsi','penyelenggara'],
+    desc: 'Data event haul & acara',
+    jsonFields: [],
+    example: {
+      judul:'Haul Sunan Ampel ke-523', tipe:'haul',
+      tanggal:'24', bulan:'MEI', tahun:'2024',
+      lokasi:'Masjid Agung Sunan Ampel, Surabaya', waktu:'19.00 WIB',
+      deskripsi:'Peringatan haul tahunan dengan pembacaan manaqib.',
+      penyelenggara:'Yayasan Masjid Ampel'
+    }
+  },
+  ziarah: {
+    required: ['judul','isi'],
+    optional: ['tips'],
+    desc: 'Panduan & tata cara ziarah',
+    jsonFields: ['tips'],
+    example: {
+      judul:'Niat dan Persiapan',
+      isi:'Berniat karena Allah SWT, bukan meminta kepada penghuni kubur.',
+      tips:'["Bawa air minum","Pakai pakaian sopan","Bawa mushaf Al-Quran"]'
+    }
   }
-}
-async function apiPost(action, payload){
-  if(!isApiConfigured()) return null;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(()=>controller.abort(), 15000);
-  try{
-    const res = await fetch(API_URL, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'}, // hindari CORS preflight ke Apps Script
-      body: JSON.stringify(Object.assign({action:action}, payload)),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    const json = await res.json();
-    if(!json || json.ok===false) console.error('Database merespons dengan error ('+action+'):', json && json.error);
-    return json;
-  }catch(err){
-    clearTimeout(timeoutId);
-    console.error('Gagal menyimpan ke database ('+action+'):', err);
-    return null;
-  }
-}
-// Upload foto ke Google Drive lewat Apps Script; fallback ke base64 lokal
-// kalau database belum disambungkan atau upload gagal.
-async function uploadImageToDrive(base64, filename){
-  if(!isApiConfigured()) return base64;
-  try{
-    const mimeMatch = /^data:(.*?);base64,/.exec(base64);
-    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const res = await apiPost('uploadImage', {base64:base64, filename:filename||('img_'+Date.now()+'.jpg'), mimeType:mimeType});
-    if(res && res.ok && res.result && res.result.url) return res.result.url;
-  }catch(err){
-    console.error('Upload foto gagal, pakai foto lokal sementara:', err);
-  }
-  return base64;
+};
+
+const CSV_INFOS = {
+  wali:   '📋 <strong>Format Wali:</strong> Kolom wajib: <code>nama, lokasi</code>. Kolom JSON (tags, nasab, murid, dll) harus berupa array JSON yang valid, contoh: <code>["Pesantren","Jawa Timur"]</code>. Baris tanpa nama/lokasi akan dilewati.',
+  event:  '📋 <strong>Format Event:</strong> Kolom wajib: <code>judul, tanggal, bulan, tahun, lokasi</code>. Kolom <code>tipe</code> isi dengan: haul / event. Tanggal hanya angka (mis. 24).',
+  ziarah: '📋 <strong>Format Ziarah:</strong> Kolom wajib: <code>judul, isi</code>. Kolom <code>tips</code> berupa array JSON: <code>["tip1","tip2"]</code>.'
+};
+
+function csvSwitchTab(tab){
+  csvCurrentTab = tab;
+  csvParsedRows = [];
+  ['wali','event','ziarah'].forEach(t=>{
+    const btn=document.getElementById('csv-tab-'+t);
+    if(!btn) return;
+    const active = t===tab;
+    btn.style.background = active?'var(--gd)':'var(--white)';
+    btn.style.color = active?'#fff':'var(--tm)';
+    btn.style.borderColor = active?'var(--gd)':'var(--border)';
+  });
+  const info=document.getElementById('csv-info');
+  if(info) info.innerHTML = CSV_INFOS[tab]||'';
+  csvReset();
 }
 
-// ─── NAVIGATION ───
+function csvReset(){
+  csvParsedRows=[];
+  const p=document.getElementById('csv-preview'); if(p) p.style.display='none';
+  const l=document.getElementById('csv-log'); if(l) l.style.display='none';
+  const e=document.getElementById('csv-errors'); if(e){e.style.display='none';e.innerHTML='';}
+  const t=document.getElementById('csv-table-wrap'); if(t) t.innerHTML='';
+  const s=document.getElementById('csv-summary'); if(s) s.innerHTML='';
+}
+
+// ── TEMPLATE DOWNLOAD ──────────────────────────────
+function csvDownloadTemplate(){
+  const schema = CSV_SCHEMA[csvCurrentTab];
+  const allCols = [...schema.required, ...schema.optional];
+  const ex = schema.example;
+  let csv = allCols.join(',') + '\n';
+  csv += allCols.map(c=>{
+    const v = ex[c]||'';
+    // kutip nilai yang mengandung koma, newline, atau kutip
+    if(/[,"\n]/.test(String(v))) return '"'+String(v).replace(/"/g,'""')+'"';
+    return String(v);
+  }).join(',') + '\n';
+  // baris kedua kosong sebagai contoh tambah data
+  csv += allCols.map(c=>schema.required.includes(c)?'(wajib)':'(opsional)').join(',') + '\n';
+
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'template_'+csvCurrentTab+'_penjaga_warisan.csv';
+  a.click();
+  toast('⬇️ Template '+csvCurrentTab+'.csv diunduh');
+}
+
+// ── FILE READER & PARSER ───────────────────────────
+function csvReadFile(ev){
+  const file = ev.target.files[0];
+  if(!file){ toast('⚠️ Tidak ada file dipilih'); return; }
+  if(!file.name.toLowerCase().endsWith('.csv')){
+    toast('⚠️ File harus berekstensi .csv'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    // Hapus BOM UTF-8 kalau ada
+    text = text.replace(/^\uFEFF/,'');
+    csvParseAndPreview(text);
+  };
+  reader.onerror = () => toast('⚠️ Gagal membaca file');
+  reader.readAsText(file, 'UTF-8');
+  ev.target.value = ''; // reset input supaya file yang sama bisa dipilih ulang
+}
+
+function csvParseCSV(text){
+  // Parser CSV robust: handle quoted fields, escaped quotes, CRLF/LF
+  const rows = [];
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+  const parseRow = line => {
+    const fields = []; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(inQ){
+        if(ch==='"'&&line[i+1]==='"'){ cur+='"'; i++; }
+        else if(ch==='"'){ inQ=false; }
+        else cur+=ch;
+      } else {
+        if(ch==='"'){ inQ=true; }
+        else if(ch===','){ fields.push(cur.trim()); cur=''; }
+        else cur+=ch;
+      }
+    }
+    fields.push(cur.trim());
+    return fields;
+  };
+  for(const line of lines){ if(line.trim()) rows.push(parseRow(line)); }
+  return rows;
+}
+
+function csvParseAndPreview(text){
+  const schema = CSV_SCHEMA[csvCurrentTab];
+  const raw    = csvParseCSV(text);
+  if(raw.length < 2){
+    toast('⚠️ File CSV kosong atau tidak ada baris data'); return; }
+
+  // Normalkan header: lowercase, trim, hapus karakter BOM tersisa
+  const headers = raw[0].map(h=>h.toLowerCase().trim().replace(/[^\w_]/g,''));
+  const dataRows = raw.slice(1).filter(r=>r.some(c=>c.trim()!=='') && r.join('').trim()!=='');
+
+  // Validasi kolom wajib ada di header
+  const missing = schema.required.filter(c=>!headers.includes(c));
+  const errors  = [];
+  if(missing.length){
+    errors.push('❌ Kolom wajib tidak ditemukan: <strong>'+missing.join(', ')+'</strong>. Pastikan header sesuai template.');
+  }
+
+  // Validasi & transformasi tiap baris
+  const valid=[], warnings=[];
+  dataRows.forEach((row,idx)=>{
+    const rowNum = idx+2; // +2 karena baris 1 = header
+    const obj={};
+    // Lewati baris contoh "(wajib)" / "(opsional)"
+    const firstVal = (row[0]||'').trim();
+    if(firstVal==='(wajib)'||firstVal==='(opsional)') return;
+
+    headers.forEach((h,i)=>{ obj[h] = (row[i]||'').trim(); });
+
+    // Cek kolom wajib tidak kosong
+    const emptyReq = schema.required.filter(c=>!obj[c]);
+    if(emptyReq.length){
+      warnings.push(`Baris ${rowNum}: kolom wajib kosong (${emptyReq.join(', ')}) — dilewati`);
+      return;
+    }
+
+    // Parse kolom JSON (tags, nasab, dll)
+    schema.jsonFields.forEach(jf=>{
+      if(obj[jf]){
+        try{
+          const parsed = JSON.parse(obj[jf]);
+          obj[jf] = Array.isArray(parsed)?parsed:[parsed];
+        }catch(e){
+          // Coba split by | sebagai fallback
+          obj[jf] = obj[jf].split('|').map(s=>s.trim()).filter(Boolean);
+          if(obj[jf].length===0) obj[jf]=[];
+          warnings.push(`Baris ${rowNum}: kolom "${jf}" bukan JSON valid, dikonversi otomatis`);
+        }
+      } else { obj[jf]=[]; }
+    });
+
+    // Bangun objek final sesuai tipe
+    if(csvCurrentTab==='wali'){
+      valid.push({
+        nama:obj.nama, asli:obj.asli||'', img:obj.img||'', lokasi:obj.lokasi,
+        wilayah:obj.wilayah||'', asal:obj.asal||'', lahir:obj.lahir||'',
+        wafat:obj.wafat||'', dakwah:obj.dakwah||'', peran:obj.peran||'',
+        bio:obj.bio||'', tags:obj.tags||[], nasab:obj.nasab||[],
+        keluarga:obj.keluarga||[], murid:obj.murid||[], ajaran:obj.ajaran||[],
+        karya:obj.karya||[], karomah:obj.karomah||[], peninggalan:obj.peninggalan||[],
+        galeri:obj.galeri||[],
+        makam:{nama:obj.makam_nama||('Makam '+obj.nama),
+               alamat:obj.makam_alamat||obj.lokasi,
+               maps:obj.makam_maps||''}
+      });
+    } else if(csvCurrentTab==='event'){
+      valid.push({
+        judul:obj.judul, tipe:obj.tipe||'event', tanggal:obj.tanggal,
+        bulan:obj.bulan, tahun:obj.tahun, lokasi:obj.lokasi,
+        waktu:obj.waktu||'', img:obj.img||'',
+        deskripsi:obj.deskripsi||'', penyelenggara:obj.penyelenggara||''
+      });
+    } else {
+      valid.push({
+        judul:obj.judul, isi:obj.isi, tips:obj.tips||[]
+      });
+    }
+  });
+
+  csvParsedRows = valid;
+
+  // Tampilkan hasil
+  const preview = document.getElementById('csv-preview');
+  const errEl   = document.getElementById('csv-errors');
+  const sumEl   = document.getElementById('csv-summary');
+  const tableWrap=document.getElementById('csv-table-wrap');
+  const logEl   = document.getElementById('csv-log');
+  if(preview) preview.style.display='block';
+  if(logEl)   logEl.style.display='none';
+
+  // Error kolom wajib tidak ada
+  if(errors.length && errEl){
+    errEl.style.display='block';
+    errEl.innerHTML=errors.join('<br>');
+    const sb=document.getElementById('csv-sync-btn');
+    if(sb) sb.disabled=true;
+    if(sumEl) sumEl.innerHTML=`<div style="font-size:12px;color:var(--red);font-weight:700">⛔ File tidak dapat disinkronkan — perbaiki error di atas</div>`;
+    tableWrap.innerHTML='';
+    return;
+  }
+  if(errEl) errEl.style.display='none';
+  const sb=document.getElementById('csv-sync-btn');
+  if(sb) sb.disabled=false;
+
+  // Ringkasan
+  const dupeNames = valid.map(r=>r.nama||r.judul||r.judul||'').filter(Boolean);
+  const dupeCount = dupeNames.length - new Set(dupeNames).size;
+  const warnHTML  = warnings.length?`<div style="margin-top:6px;font-size:10px;color:var(--amber)">⚠️ ${warnings.length} peringatan: ${warnings.slice(0,3).join('; ')}${warnings.length>3?' ...':''}</div>`:'';
+  if(sumEl) sumEl.innerHTML=`
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="background:var(--gl);color:var(--gd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px">✅ ${valid.length} baris valid</span>
+      ${dataRows.length-valid.length>0?`<span style="background:var(--amberl);color:var(--amber);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px">⚠️ ${dataRows.length-valid.length} dilewati</span>`:''}
+      ${dupeCount>0?`<span style="background:var(--redl);color:var(--red);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px">🔁 ${dupeCount} nama ganda (akan di-merge)</span>`:''}
+    </div>${warnHTML}`;
+
+  // Preview tabel (max 8 baris)
+  if(valid.length && tableWrap){
+    const cols = csvCurrentTab==='wali'
+      ? ['nama','lokasi','wilayah','lahir','wafat']
+      : csvCurrentTab==='event'
+      ? ['judul','tipe','tanggal','bulan','tahun','lokasi']
+      : ['judul','isi'];
+    const colLabels = {nama:'Nama',lokasi:'Lokasi',wilayah:'Wilayah',lahir:'Lahir',wafat:'Wafat',
+      judul:'Judul',tipe:'Tipe',tanggal:'Tgl',bulan:'Bulan',tahun:'Tahun',isi:'Isi'};
+    const preview8 = valid.slice(0,8);
+    tableWrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:var(--gd)">
+        <th style="padding:7px 8px;color:var(--gold);text-align:left;font-weight:700">#</th>
+        ${cols.map(c=>`<th style="padding:7px 8px;color:var(--gold);text-align:left;font-weight:700;white-space:nowrap">${colLabels[c]||c}</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${preview8.map((r,i)=>`<tr style="background:${i%2?'var(--cream)':'var(--white)'}">
+          <td style="padding:6px 8px;color:var(--tmut);font-weight:700">${i+1}</td>
+          ${cols.map(c=>`<td style="padding:6px 8px;color:var(--td);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${String(r[c]||'').replace(/"/g,'&quot;')}">${String(r[c]||'-').slice(0,40)}</td>`).join('')}
+        </tr>`).join('')}
+        ${valid.length>8?`<tr><td colspan="${cols.length+1}" style="padding:7px 8px;text-align:center;font-size:10px;color:var(--tmut)">... dan ${valid.length-8} baris lainnya</td></tr>`:''}
+      </tbody>
+    </table>`;
+  }
+}
+
+// ── SYNC KE SUPABASE ───────────────────────────────
+async function csvSync(){
+  if(!csvParsedRows.length){ toast('⚠️ Tidak ada data untuk disinkronkan'); return; }
+  const btn=document.getElementById('csv-sync-btn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Menyinkronkan...'; }
+  const logEl=document.getElementById('csv-log');
+  if(logEl){ logEl.style.display='block'; logEl.innerHTML=''; }
+  const log = msg => { if(logEl) logEl.innerHTML+=msg+'<br>'; logEl.scrollTop=logEl.scrollHeight; };
+
+  const tab   = csvCurrentTab;
+  const table = tab==='wali'?'pw_wali':tab==='event'?'pw_events':'pw_ziarah';
+  let ok=0, fail=0, skip=0;
+
+  log(`▶ Mulai sinkronisasi ${csvParsedRows.length} baris ke tabel <strong>${table}</strong>...`);
+
+  if(!dbConnected){ log('⚠️ Tidak tersambung ke Supabase — data hanya disimpan lokal sementara'); }
+
+  for(let i=0; i<csvParsedRows.length; i++){
+    const row = {...csvParsedRows[i], updated_at: new Date().toISOString()};
+    const label = row.nama||row.judul||('Baris '+(i+1));
+    try{
+      if(dbConnected){
+        const res = await sbUpsert(table, row);
+        if(res){ ok++; log(`✅ [${i+1}] ${label}`); }
+        else    { fail++; log(`❌ [${i+1}] ${label} — gagal: ${lastApiError.slice(0,80)}`); }
+      } else {
+        // simpan ke DB lokal saja
+        if(tab==='wali'){
+          const existing=DB.wali.findIndex(w=>w.nama===row.nama);
+          const newId = existing>=0 ? DB.wali[existing].id : (Math.max(0,...DB.wali.map(w=>w.id))+1);
+          const waliObj = {...row, id:newId, ...(!row.id&&{id:newId})};
+          if(existing>=0) DB.wali[existing]=waliObj; else DB.wali.push(waliObj);
+        } else if(tab==='event'){
+          const existing=DB.events.findIndex(e=>e.judul===row.judul);
+          const newId = existing>=0 ? DB.events[existing].id : (Math.max(0,...DB.events.map(e=>e.id))+1);
+          if(existing>=0) DB.events[existing]={...row,id:newId}; else DB.events.push({...row,id:newId});
+        } else {
+          const existing=DB.ziarah.findIndex(z=>z.judul===row.judul);
+          const newId = existing>=0 ? DB.ziarah[existing].id : (Math.max(0,...DB.ziarah.map(z=>z.id))+1);
+          if(existing>=0) DB.ziarah[existing]={...row,id:newId}; else DB.ziarah.push({...row,id:newId});
+        }
+        ok++; log(`💾 [${i+1}] ${label} (lokal)`);
+      }
+    }catch(e){ fail++; log(`❌ [${i+1}] ${label} — error: ${String(e).slice(0,80)}`); }
+    // jeda kecil supaya UI tidak beku
+    if(i%5===4) await new Promise(r=>setTimeout(r,120));
+  }
+
+  // Jika tersambung ke Supabase, reload data terbaru
+  if(dbConnected){
+    log('🔄 Memuat ulang data dari Supabase...');
+    await loadFromSupabase();
+  }
+  // Dedup dan render ulang semua
+  DB.wali=deduplicate(DB.wali);
+  DB.events=deduplicate(DB.events);
+  DB.ziarah=deduplicate(DB.ziarah);
+  renderHome(); renderDir(); renderEvents(); renderZiarah(); renderAdmin();
+  updateAllCounts();
+
+  log(`<br><strong>Selesai:</strong> ✅ ${ok} berhasil · ❌ ${fail} gagal · ⏭ ${skip} dilewati`);
+  toast(`✅ Sinkronisasi selesai: ${ok} dari ${csvParsedRows.length} data berhasil disimpan`);
+  if(btn){ btn.disabled=false; btn.textContent='💾 Sinkronkan ke Database'; }
+
+  // Update badge menu
+  const badge=document.getElementById('csv-badge');
+  if(badge) badge.textContent=`Wali: ${DB.wali.length} · Event: ${DB.events.length}`;
+}
+
+
+// Hilangkan data ganda berdasarkan id (ambil yang pertama muncul)
+function deduplicate(arr){
+  const seen = new Set();
+  return arr.filter(item => {
+    if(!item || item.id == null) return false;
+    const key = String(item.id);
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+}
+
+// Hitung count dari data aktual dan update SEMUA elemen di seluruh aplikasi
+function updateAllCounts(){
+  const w = DB.wali.length;
+  const e = DB.events.length;
+  const z = DB.ziarah.length;
+  const makamCount = DB.wali.filter(x=>x.makam&&x.makam.alamat).length;
+  const ajaranCount = DB.wali.reduce((s,x)=>s+asArr(x.ajaran).length, 0);
+
+  // Hero beranda stats
+  const el = (id,v) => { const n=document.getElementById(id); if(n) n.textContent=v; };
+  el('hs-wali',   w);
+  el('hs-makam',  makamCount || w);
+  el('hs-ajaran', ajaranCount || '—');
+  el('hs-event',  e);
+
+  // Admin quick-stats (topbar)
+  el('a-wali',   w);
+  el('a-event',  e);
+  el('a-ziarah', z);
+
+  // Admin laporan panel (kalau sedang terbuka)
+  el('rpt-wali',  w);
+  el('rpt-event', e);
+  el('rpt-ziarah',z);
+  el('rpt-makam', makamCount || w);
+  el('rpt-ajaran',ajaranCount);
+  el('rpt-murid', DB.wali.reduce((s,x)=>s+asArr(x.murid).length, 0));
+  el('rpt-karya', DB.wali.reduce((s,x)=>s+asArr(x.karya).length, 0));
+}
+
+
 function goScreen(name){
   if(name===curScreen) return;
   prevScreen = curScreen;
@@ -1050,6 +1474,7 @@ function adminLogout(){
 
 // ─── RENDER HOME ───
 function renderHome(){
+  updateAllCounts();
   const heroEl=document.getElementById('hero-banner-img');
   if(heroEl) heroEl.src=heroImg;
   document.getElementById('home-wali-scroll').innerHTML = DB.wali.slice(0,4).map(w=>`
@@ -1058,7 +1483,7 @@ function renderHome(){
       <div class="wali-name">${w.nama}</div><div class="wali-loc">${w.lokasi}</div>
       <div class="wali-gold">✦ ✦ ✦</div>
     </div>`).join('');
-  document.getElementById('home-event-list').innerHTML = DB.events.slice(0,3).map(e=>`
+  document.getElementById('home-event-list').innerHTML = DB.events.slice(0,2).map(e=>`
     <div class="event-card" onclick="showEventDetail(${e.id})">
       <div class="evt-date-badge"><div class="evt-date-num">${e.tanggal}</div><div class="evt-date-mon">${e.bulan}</div><div class="evt-date-yr">${e.tahun}</div></div>
       <div class="event-card-img"><img src="${e.img}" alt="${e.judul}" loading="lazy"></div>
@@ -1308,14 +1733,192 @@ function renderDetTab(){
       </div>
     </div>`;
   } else if(curDetTab===9){
-    body.innerHTML=`<div class="sec-label">Galeri Foto</div><div class="galeri-grid">`+
-      asArr(w.galeri).map((g,i)=>`<div class="gal-item"><img src="${g}" alt="galeri ${i+1}" loading="lazy"><div class="gal-caption">Foto ${i+1}</div></div>`).join('')+
-      `</div>
-      <button style="width:100%;margin-top:10px;background:var(--gl);color:var(--gd);border:0.5px solid var(--border);border-radius:12px;padding:10px;font-size:12px;font-weight:700;cursor:pointer" onclick="openAdminPanel('galeri')">+ Upload Foto Baru</button>`;
+    body.innerHTML=`<div class="sec-label">Galeri Foto</div>` + buildGaleriSlider(asArr(w.galeri), w.nama);
   }
 }
 
-// ─── RENDER EVENTS ───
+// ─── GALERI GLOBAL ─────────────────────────────────
+function buildGlobalGallery(){
+  // Kumpulkan semua foto dari galeri tiap wali, deduplicate by src
+  const seen = new Set();
+  GALLERY_PHOTOS = [];
+  DB.wali.forEach(w=>{
+    asArr(w.galeri).forEach((src,i)=>{
+      const s = typeof src==='string'?src:(src.src||src);
+      if(s && !seen.has(s)){
+        seen.add(s);
+        GALLERY_PHOTOS.push({id:w.id+'_g'+i, src:s, caption:w.nama+' – foto '+(i+1), waliId:w.id});
+      }
+    });
+  });
+}
+
+function renderAdmGaleriGrid(){
+  if(!GALLERY_PHOTOS.length) return `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--tmut);font-size:12px">Belum ada foto. Upload foto baru di atas.</div>`;
+  return GALLERY_PHOTOS.map((p,i)=>`
+    <div class="adm-galeri-cell">
+      <img src="${p.src}" alt="${p.caption}">
+      <button class="adm-galeri-del" title="Hapus foto ini" onclick="deleteGlobalPhoto(${i})">×</button>
+    </div>`).join('');
+}
+
+async function handleGlobalGaleriUpload(ev){
+  const files=[...ev.target.files]; if(!files.length) return;
+  toast('⏳ Mengunggah '+files.length+' foto...');
+  let done=0;
+  for(const file of files){
+    await new Promise(res=>{
+      const reader=new FileReader();
+      reader.onload=e=>{
+        const src=e.target.result;
+        // Tambahkan ke wali pertama yang dipilih, atau simpan sebagai standalone
+        // Untuk sekarang: tambahkan ke GALLERY_PHOTOS dan ke galeri wali pertama jika ada
+        GALLERY_PHOTOS.push({id:'glob_'+Date.now()+'_'+done, src, caption:'Foto Upload '+(GALLERY_PHOTOS.length+1), waliId:null});
+        done++; res();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  // Refresh grid
+  const grid=document.getElementById('adm-galeri-grid');
+  if(grid) grid.innerHTML=renderAdmGaleriGrid();
+  const cnt=document.getElementById('galeri-count');
+  if(cnt) cnt.textContent=GALLERY_PHOTOS.length;
+  toast('✅ '+done+' foto berhasil diupload ke galeri');
+  ev.target.value='';
+}
+
+function deleteGlobalPhoto(idx){
+  if(idx<0||idx>=GALLERY_PHOTOS.length) return;
+  const p=GALLERY_PHOTOS[idx];
+  // Hapus dari galeri wali yang bersangkutan
+  if(p.waliId){
+    const w=DB.wali.find(x=>x.id===p.waliId);
+    if(w){ w.galeri=asArr(w.galeri).filter(s=>(typeof s==='string'?s:(s.src||s))!==p.src); }
+  }
+  GALLERY_PHOTOS.splice(idx,1);
+  const grid=document.getElementById('adm-galeri-grid');
+  if(grid) grid.innerHTML=renderAdmGaleriGrid();
+  const cnt=document.getElementById('galeri-count');
+  if(cnt) cnt.textContent=GALLERY_PHOTOS.length;
+  toast('🗑️ Foto dihapus dari galeri');
+}
+
+
+// photos = array of url string atau {src,caption}
+function buildGaleriSlider(photos, waliNama){
+  if(!photos || photos.length===0) return `<div class="galeri-empty">📷<br>Belum ada foto galeri<br><span style="font-size:10px">Upload foto melalui menu Admin → Kelola Wali</span></div>`;
+  const imgs = photos.map((p,i)=>({
+    src: typeof p==='string'?p:(p.src||p),
+    caption: typeof p==='object'&&p.caption ? p.caption : (waliNama ? waliNama+' ('+(i+1)+')' : 'Foto '+(i+1))
+  }));
+  const total = imgs.length;
+  const pageCount = Math.ceil(total/2);
+  const uid = 'sl'+Math.random().toString(36).slice(2,8);
+
+  const slides = imgs.map((img,i)=>`
+    <div class="slider-slide" data-idx="${i}">
+      <img src="${img.src}" alt="${img.caption}" loading="lazy" onclick="openLightbox('${uid}',${i})">
+      <div class="slider-caption">${img.caption}</div>
+    </div>`).join('');
+
+  const dotsHtml = pageCount>1
+    ? Array.from({length:pageCount},(_,i)=>`<span class="slider-dot${i===0?' active':''}" data-page="${i}" onclick="sliderGoPage('${uid}',${i})"></span>`).join('')
+    : '';
+
+  const html = `
+    <div class="slider-outer" id="${uid}-outer" data-uid="${uid}" data-page="0" data-count="${pageCount}">
+      <div class="slider-wrap">
+        <div class="slider-track" id="${uid}-track">${slides}</div>
+      </div>
+      ${pageCount>1?`
+      <div class="slider-nav">
+        <button class="slider-btn" id="${uid}-prev" onclick="sliderGoPage('${uid}',sliderCurPage('${uid}')-1)" aria-label="Sebelumnya">‹</button>
+        <div class="slider-dots" id="${uid}-dots">${dotsHtml}</div>
+        <span class="slider-counter" id="${uid}-cnt">1 / ${pageCount}</span>
+        <button class="slider-btn" id="${uid}-next" onclick="sliderGoPage('${uid}',sliderCurPage('${uid}')+1)" aria-label="Berikutnya">›</button>
+      </div>`:''}
+    </div>
+    <div id="${uid}-lb" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;align-items:center;justify-content:center;flex-direction:column">
+      <button onclick="document.getElementById('${uid}-lb').style.display='none'" style="position:absolute;top:16px;right:18px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>
+      <img id="${uid}-lb-img" src="" style="max-width:92vw;max-height:76vh;object-fit:contain;border-radius:10px">
+      <div id="${uid}-lb-cap" style="color:rgba(255,255,255,.7);font-size:12px;margin-top:10px;text-align:center"></div>
+      <div style="display:flex;gap:20px;margin-top:14px">
+        <button onclick="lbNav('${uid}',-1)" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:44px;height:44px;border-radius:50%;font-size:24px;cursor:pointer">‹</button>
+        <button onclick="lbNav('${uid}',1)"  style="background:rgba(255,255,255,.15);border:none;color:#fff;width:44px;height:44px;border-radius:50%;font-size:24px;cursor:pointer">›</button>
+      </div>
+    </div>`;
+
+  // Init slider setelah DOM selesai dirender
+  setTimeout(()=>sliderInit(uid), 60);
+  return html;
+}
+
+function sliderInit(uid){
+  // Pastikan tombol prev disabled di halaman 0
+  const prev=document.getElementById(uid+'-prev');
+  const next=document.getElementById(uid+'-next');
+  const outer=document.getElementById(uid+'-outer');
+  if(!outer) return;
+  const pageCount=parseInt(outer.dataset.count)||1;
+  if(prev) prev.disabled=true;
+  if(next) next.disabled=(pageCount<=1);
+}
+
+function sliderCurPage(uid){
+  const outer=document.getElementById(uid+'-outer');
+  return outer ? parseInt(outer.dataset.page||'0') : 0;
+}
+
+function sliderGoPage(uid, page){
+  const outer=document.getElementById(uid+'-outer'); if(!outer) return;
+  const track=document.getElementById(uid+'-track');  if(!track) return;
+  const pageCount=parseInt(outer.dataset.count)||1;
+  page=Math.max(0, Math.min(page, pageCount-1));
+
+  // Hitung lebar satu slide langsung dari elemen
+  const firstSlide=track.querySelector('.slider-slide');
+  if(!firstSlide) return;
+  const slideW=firstSlide.getBoundingClientRect().width || firstSlide.offsetWidth;
+  if(!slideW) return; // elemen belum terrender, coba lagi
+
+  // Geser track: setiap halaman = 2 slide
+  track.style.transform=`translateX(${-page * slideW * 2}px)`;
+  outer.dataset.page=page;
+
+  // Update dots
+  outer.querySelectorAll('.slider-dot').forEach((d,i)=>d.classList.toggle('active',i===page));
+
+  // Counter
+  const cnt=document.getElementById(uid+'-cnt');
+  if(cnt) cnt.textContent=(page+1)+' / '+pageCount;
+
+  // Tombol prev/next
+  const prev=document.getElementById(uid+'-prev');
+  const next=document.getElementById(uid+'-next');
+  if(prev){ prev.disabled=(page===0); }
+  if(next){ next.disabled=(page>=pageCount-1); }
+}
+
+
+// Lightbox
+let _lbPhotos=[], _lbIdx=0, _lbUid='';
+function openLightbox(uid,idx){
+  const track=document.getElementById(uid+'-track'); if(!track) return;
+  _lbPhotos=[...track.querySelectorAll('.slider-slide img')].map(img=>({src:img.src,cap:img.alt}));
+  _lbIdx=idx; _lbUid=uid;
+  lbShow();
+  document.getElementById(uid+'-lb').style.display='flex';
+}
+function lbShow(){
+  const img=document.getElementById(_lbUid+'-lb-img');
+  const cap=document.getElementById(_lbUid+'-lb-cap');
+  if(img) img.src=_lbPhotos[_lbIdx].src;
+  if(cap) cap.textContent=_lbPhotos[_lbIdx].cap+' ('+(_lbIdx+1)+'/'+_lbPhotos.length+')';
+}
+function lbNav(uid,dir){ _lbIdx=(_lbIdx+dir+_lbPhotos.length)%_lbPhotos.length; lbShow(); }
+
+
 function renderEvents(){
   const filts=['Semua','Haul','Event'];
   document.getElementById('evt-filters').innerHTML=filts.map(f=>`<div class="ftab${f===evtFilter?' active':''}" onclick="setEvtFilter('${f}')">${f}</div>`).join('');
@@ -1360,9 +1963,14 @@ function toggleZCard(id){
 
 // ─── RENDER ADMIN ───
 function renderAdmin(){
+  // pastikan tidak ada data ganda sebelum render
+  DB.wali   = deduplicate(DB.wali);
+  DB.events = deduplicate(DB.events);
+  DB.ziarah = deduplicate(DB.ziarah);
   document.getElementById('a-wali').textContent=DB.wali.length;
   document.getElementById('a-event').textContent=DB.events.length;
   document.getElementById('a-ziarah').textContent=DB.ziarah.length;
+  updateAllCounts();
   document.getElementById('act-list').innerHTML=[
     {text:'Data Sunan Kalijaga diperbarui',time:'2 jam lalu',color:'#2D6A4F'},
     {text:'Event baru ditambahkan',time:'5 jam lalu',color:'#C9A84C'},
@@ -1378,7 +1986,7 @@ function openAdminPanel(type){
   // tampilkan panelnya DULU, baru isi kontennya — supaya panel selalu kebuka
   // walau ada masalah saat menyiapkan datanya
   document.getElementById('admin-overlay').classList.add('open');
-  const titles={wali:'Kelola Data Wali',event:'Kelola Event & Haul',ziarah:'Kelola Pedoman Ziarah',galeri:'Kelola Galeri Foto',pengguna:'Kelola Pengguna',laporan:'Laporan & Statistik',beranda:'Banner Beranda'};
+  const titles={wali:'Kelola Data Wali',event:'Kelola Event & Haul',ziarah:'Kelola Pedoman Ziarah',galeri:'Kelola Galeri Foto',pengguna:'Kelola Pengguna',laporan:'Laporan & Statistik',beranda:'Banner Beranda',csv:'Import & Sinkronkan Data CSV'};
   document.getElementById('admin-panel-title').textContent=titles[type]||type;
   const body=document.getElementById('admin-panel-body');
   const footer=document.getElementById('admin-panel-footer');
@@ -1452,19 +2060,19 @@ function openAdminPanel(type){
       </div>`;
   }
   else if(type==='galeri'){
-    const allImgs=[...IMGS.galeri,...IMGS.makam,...IMGS.event];
+    // Kumpulkan galeri dari semua wali + GALLERY_PHOTOS global
+    buildGlobalGallery();
     body.innerHTML=`
-      <div class="img-upload-wrap" style="margin-bottom:16px;min-height:80px" onclick="simulateUpload('global')">
-        <img class="upload-icon-img" src="https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=64&h=64&fit=crop&q=80" style="width:36px;height:36px;border-radius:8px;opacity:0.4">
-        <div class="img-upload-text">Klik untuk Upload Foto Baru</div>
-        <input type="file" accept="image/*" class="img-upload-input" onchange="handleGaleriUpload(event)">
+      <div style="font-size:12px;color:var(--tmut);margin-bottom:10px;line-height:1.6">
+        Foto yang diupload di sini akan tampil di tab <strong>Galeri Foto</strong> setiap wali. Upload per wali bisa dilakukan via menu <em>Kelola Wali → Edit</em>.
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        ${allImgs.map((img,i)=>`<div style="position:relative;border-radius:9px;overflow:hidden">
-          <img src="${img}" style="width:100%;height:80px;object-fit:cover;display:block">
-          <div style="position:absolute;top:4px;right:4px;background:rgba(220,38,38,0.85);border-radius:5px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;font-weight:800;color:#fff" onclick="toast('Foto dihapus dari galeri')">×</div>
-        </div>`).join('')}
-      </div>`;
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--gl);border:1.5px dashed var(--gd);border-radius:12px;padding:13px;font-size:12px;font-weight:700;color:var(--gd);cursor:pointer;margin-bottom:12px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Foto Baru ke Galeri Global
+        <input type="file" accept="image/*" multiple style="display:none" onchange="handleGlobalGaleriUpload(event)">
+      </label>
+      <div style="font-size:11px;font-weight:700;color:var(--td);margin-bottom:8px">Semua Foto (<span id="galeri-count">${GALLERY_PHOTOS.length}</span> foto)</div>
+      <div class="adm-galeri-grid" id="adm-galeri-grid">${renderAdmGaleriGrid()}</div>`;
   }
   else if(type==='pengguna'){
     const users=[{nama:'Ahmad Fauzan',email:'ahmad@penjaga.id',role:'Admin',avatar:IMGS.wali[0]},{nama:'Siti Rahmah',email:'siti@email.com',role:'Editor',avatar:IMGS.wali[3]},{nama:'Budi Santoso',email:'budi@email.com',role:'Pengguna',avatar:IMGS.wali[6]},{nama:'Dewi Lestari',email:'dewi@email.com',role:'Pengguna',avatar:IMGS.wali[7]},{nama:'Rizal Hakim',email:'rizal@email.com',role:'Editor',avatar:IMGS.wali[8]}];
@@ -1481,17 +2089,64 @@ function openAdminPanel(type){
       </div>`).join('');
   }
   else if(type==='laporan'){
+    const w=DB.wali.length, e=DB.events.length, z=DB.ziarah.length;
+    const makamCount = DB.wali.filter(x=>x.makam&&x.makam.alamat).length;
+    const ajaranCount = DB.wali.reduce((s,x)=>s+asArr(x.ajaran).length,0);
+    const muridCount  = DB.wali.reduce((s,x)=>s+asArr(x.murid).length,0);
+    const karyaCount  = DB.wali.reduce((s,x)=>s+asArr(x.karya).length,0);
     body.innerHTML=`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-        ${[['Total Wali',DB.wali.length,'var(--gl)','var(--gd)'],['Total Event',DB.events.length,'var(--amberl)','var(--amber)'],['Total Panduan',DB.ziarah.length,'var(--bluel)','var(--blue)'],['Pengguna','247','var(--redl)','var(--red)']].map(([l,v,bg,tc])=>`<div style="background:${bg};border-radius:12px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:${tc}">${v}</div><div style="font-size:11px;color:${tc};opacity:0.8;margin-top:2px">${l}</div></div>`).join('')}
+        ${[['Total Wali',w,'var(--gl)','var(--gd)','rpt-wali'],['Total Event',e,'var(--amberl)','var(--amber)','rpt-event'],['Total Panduan',z,'var(--bluel)','var(--blue)','rpt-ziarah'],['Data Makam',makamCount||w,'var(--redl)','var(--red)','rpt-makam']].map(([l,v,bg,tc,id])=>`<div style="background:${bg};border-radius:12px;padding:14px;text-align:center"><div id="${id}" style="font-size:24px;font-weight:800;color:${tc}">${v}</div><div style="font-size:11px;color:${tc};opacity:0.8;margin-top:2px">${l}</div></div>`).join('')}
       </div>
-      <div class="sec-label">Wali Terpopuler</div>
-      ${DB.wali.slice(0,3).map((w,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)">
-        <div style="width:24px;height:24px;background:var(--gd);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--gold);flex-shrink:0">${i+1}</div>
-        <img src="${w.img}" style="width:40px;height:40px;border-radius:9px;object-fit:cover">
-        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--td)">${w.nama}</div><div style="font-size:10px;color:var(--tmut)">${w.lokasi}</div></div>
-        <div style="font-size:12px;font-weight:700;color:var(--gd)">${Math.floor(Math.random()*900+100)} views</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+        ${[['Ajaran',ajaranCount,'rpt-ajaran'],['Murid',muridCount,'rpt-murid'],['Karya',karyaCount,'rpt-karya']].map(([l,v,id])=>`<div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;border:0.5px solid var(--border)"><div id="${id}" style="font-size:20px;font-weight:800;color:var(--gd)">${v}</div><div style="font-size:10px;color:var(--tmut);margin-top:2px">${l}</div></div>`).join('')}
+      </div>
+      <div class="sec-label" style="margin-bottom:8px">Daftar Wali (${w} data unik)</div>
+      ${DB.wali.map((wal,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border)">
+        <div style="width:22px;height:22px;background:var(--gd);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--gold);flex-shrink:0">${i+1}</div>
+        <img src="${wal.img||''}" style="width:38px;height:38px;border-radius:9px;object-fit:cover;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:var(--td);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${wal.nama}</div>
+          <div style="font-size:10px;color:var(--tmut)">${wal.wilayah||wal.lokasi||''} · ID: ${wal.id}</div>
+        </div>
+        <div style="font-size:10px;color:var(--gd);font-weight:700">${asArr(wal.ajaran).length} ajaran</div>
       </div>`).join('')}`;
+  }
+  else if(type==='csv'){
+    body.innerHTML=`
+    <div id="csv-panel">
+      <!-- Tab pilih tipe data -->
+      <div style="display:flex;gap:7px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px">
+        ${['wali','event','ziarah'].map((t,i)=>`<button id="csv-tab-${t}" onclick="csvSwitchTab('${t}')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;border:1.5px solid ${i===0?'var(--gd)':'var(--border)'};background:${i===0?'var(--gd)':'var(--white)'};color:${i===0?'#fff':'var(--tm)'};font-size:11.5px;font-weight:700;cursor:pointer">${t==='wali'?'👤 Wali':t==='event'?'📅 Event':'📖 Ziarah'}</button>`).join('')}
+      </div>
+
+      <!-- Info format -->
+      <div id="csv-info" style="background:var(--gl);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--gd)"></div>
+
+      <!-- Download template -->
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button onclick="csvDownloadTemplate()" style="flex:1;background:var(--gd);color:#fff;border:none;border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Unduh Template CSV</button>
+        <label style="flex:1;background:var(--cream);border:1.5px dashed var(--gd);border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;color:var(--gd)">
+          📂 Pilih File CSV
+          <input type="file" accept=".csv,text/csv" style="display:none" onchange="csvReadFile(event)">
+        </label>
+      </div>
+
+      <!-- Preview & hasil validasi -->
+      <div id="csv-preview" style="display:none">
+        <div id="csv-summary" style="margin-bottom:10px"></div>
+        <div id="csv-errors" style="display:none;background:var(--redl);border:0.5px solid #FECACA;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--red)"></div>
+        <div id="csv-table-wrap" style="overflow-x:auto;border-radius:10px;border:0.5px solid var(--border);margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px">
+          <button id="csv-sync-btn" onclick="csvSync()" style="flex:1;background:var(--gd);color:#fff;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">💾 Sinkronkan ke Database</button>
+          <button onclick="csvReset()" style="flex:0;background:var(--cream);border:0.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:12px;font-weight:700;cursor:pointer;color:var(--tm)">✕ Reset</button>
+        </div>
+      </div>
+
+      <!-- Log sinkronisasi -->
+      <div id="csv-log" style="display:none;margin-top:12px;background:var(--cream);border-radius:10px;padding:12px;font-size:11px;font-family:monospace;max-height:160px;overflow-y:auto;color:var(--td)"></div>
+    </div>`;
+    csvSwitchTab('wali'); // init tab pertama
   }
   }catch(err){
     console.error('Gagal menampilkan panel admin ('+type+'):', err);
@@ -1616,9 +2271,8 @@ async function handleWaliImg(ev){
     waliFormImg=localPreview;
     const wrap=document.getElementById('wali-img-wrap');
     wrap.innerHTML=`<img class="preview" src="${localPreview}" alt="preview" style="width:100%;max-height:160px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Foto</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleWaliImg(event)">`;
-    toast(dbConnected?'⏳ Mengunggah foto...':'✅ Foto berhasil dipilih');
-    waliFormImg = await uploadImageToDrive(localPreview, 'wali_'+Date.now()+'.jpg');
-    if(dbConnected) toast('✅ Foto tersimpan');
+    toast('✅ Foto wali dipilih');
+    waliFormImg = localPreview;
   };
   reader.readAsDataURL(file);
 }
@@ -1630,9 +2284,8 @@ async function handleMakamImg(ev){
     waliFormMakamImg=localPreview;
     const wrap=document.getElementById('makam-img-wrap');
     wrap.innerHTML=`<img class="preview" src="${localPreview}" alt="makam" style="width:100%;max-height:120px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleMakamImg(event)">`;
-    toast(dbConnected?'⏳ Mengunggah foto makam...':'✅ Foto makam dipilih — klik Simpan untuk menerapkan');
-    waliFormMakamImg = await uploadImageToDrive(localPreview, 'makam_'+Date.now()+'.jpg');
-    if(dbConnected) toast('✅ Foto makam tersimpan — klik Simpan untuk menerapkan');
+    toast('✅ Foto makam dipilih — klik Simpan untuk menerapkan');
+    waliFormMakamImg = localPreview;
   };
   reader.readAsDataURL(file);
 }
@@ -1670,7 +2323,7 @@ async function handlePeninggalanImg(ev,i){
     waliFormPeninggalan[i].img=localPreview;
     renderPeninggalanList();
     toast(dbConnected?'⏳ Mengunggah foto peninggalan...':'✅ Foto peninggalan diperbarui');
-    const url = await uploadImageToDrive(localPreview, 'peninggalan_'+Date.now()+'.jpg');
+    const url = localPreview;
     if(waliFormPeninggalan[i]){ waliFormPeninggalan[i].img=url; renderPeninggalanList(); }
     if(dbConnected) toast('✅ Foto peninggalan tersimpan');
   };
@@ -1694,7 +2347,7 @@ async function handleGaleriAdd(ev){
     waliFormGaleri.push(localPreview);
     renderGaleriGrid();
     toast(dbConnected?'⏳ Mengunggah foto galeri...':'✅ Foto ditambahkan ke galeri');
-    const url = await uploadImageToDrive(localPreview, 'galeri_'+Date.now()+'.jpg');
+    const url = localPreview;
     if(waliFormGaleri[idx]===localPreview){ waliFormGaleri[idx]=url; renderGaleriGrid(); }
     if(dbConnected) toast('✅ Foto galeri tersimpan');
   };
@@ -1714,18 +2367,14 @@ async function handleHeroImg(ev){
   const file=ev.target.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=async e=>{
-    const localPreview=e.target.result;
-    heroImg=localPreview;
+    heroImg=e.target.result;
     const wrap=document.getElementById('hero-img-wrap');
-    if(wrap) wrap.innerHTML=`<img class="preview" src="${localPreview}" alt="hero banner" style="width:100%;max-height:170px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Banner</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleHeroImg(event)">`;
+    if(wrap) wrap.innerHTML=`<img class="preview" src="${heroImg}" alt="hero banner" style="width:100%;max-height:170px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti Banner</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleHeroImg(event)">`;
     const heroEl=document.getElementById('hero-banner-img');
-    if(heroEl) heroEl.src=localPreview;
-    toast(dbConnected?'⏳ Mengunggah banner...':'✅ Banner beranda berhasil diperbarui!');
-    heroImg = await uploadImageToDrive(localPreview, 'hero_'+Date.now()+'.jpg');
     if(heroEl) heroEl.src=heroImg;
+    toast('✅ Banner beranda diperbarui!');
     if(dbConnected){
-      await apiPost('saveSettings', {data:{heroImg:heroImg}});
-      toast('✅ Banner tersimpan ke database');
+      await sbSettingSet('heroImg', heroImg);
     }
   };
   reader.readAsDataURL(file);
@@ -1767,9 +2416,13 @@ async function saveWali(){
     toast(dbConnected?'⏳ Menyimpan ke database...':'✅ Wali baru berhasil ditambahkan!');
   }
   if(dbConnected){
-    const res=await apiPost('saveWali', {data:Object.assign({id:savedId}, data)});
-    if(res&&res.ok){ toast('✅ Data wali tersimpan ke database!'); }
-    else { toast('⚠️ Gagal menyimpan ke database, perubahan hanya tersimpan sementara.'); }
+    const payload={...data,id:savedId,tags:JSON.parse(JSON.stringify(asArr(data.tags))),
+      nasab:asArr(data.nasab),keluarga:asArr(data.keluarga),murid:asArr(data.murid),
+      ajaran:asArr(data.ajaran),karya:asArr(data.karya),karomah:asArr(data.karomah),
+      peninggalan:asArr(data.peninggalan),galeri:asArr(data.galeri),
+      makam:data.makam||{},updated_at:new Date().toISOString()};
+    const res=await sbUpsert('pw_wali', payload);
+    toast(res?'✅ Wali tersimpan ke Supabase!':'⚠️ Gagal simpan ke database: '+lastApiError);
   }
   closeWaliForm();
   renderAdmin();
@@ -1829,7 +2482,7 @@ async function handleEvtImg(ev){
     const w=document.getElementById('evt-img-wrap');
     w.innerHTML=`<img class="preview" src="${localPreview}" style="width:100%;height:120px;object-fit:cover"><div class="img-upload-overlay"><button class="img-upload-btn">🖼️ Ganti</button></div><input type="file" accept="image/*" class="img-upload-input" onchange="handleEvtImg(event)">`;
     toast(dbConnected?'⏳ Mengunggah foto event...':'✅ Foto event dipilih — klik Simpan untuk menerapkan');
-    eventFormImg = await uploadImageToDrive(localPreview, 'event_'+Date.now()+'.jpg');
+    eventFormImg = localPreview;
     if(dbConnected) toast('✅ Foto event tersimpan — klik Simpan untuk menerapkan');
   };
   reader.readAsDataURL(file);
@@ -1861,8 +2514,8 @@ async function saveEvent(id){
     toast(dbConnected?'⏳ Menyimpan event...':'✅ Event baru ditambahkan!');
   }
   if(dbConnected){
-    const res=await apiPost('saveEvent', {data:Object.assign({id:savedId}, data)});
-    toast(res&&res.ok?'✅ Event tersimpan ke database!':'⚠️ Gagal menyimpan ke database.');
+    const res=await sbUpsert('pw_events', {...data,id:savedId,updated_at:new Date().toISOString()});
+    toast(res?'✅ Event tersimpan ke Supabase!':'⚠️ Gagal simpan: '+lastApiError);
   }
   openAdminPanel('event');
   renderAdmin();
@@ -1905,8 +2558,8 @@ async function saveZiarah(id){
     toast(dbConnected?'⏳ Menyimpan panduan...':'✅ Panduan baru ditambahkan!');
   }
   if(dbConnected){
-    const res=await apiPost('saveZiarah', {data:{id:savedId,judul,isi,tips}});
-    toast(res&&res.ok?'✅ Panduan tersimpan ke database!':'⚠️ Gagal menyimpan ke database.');
+    const res=await sbUpsert('pw_ziarah', {id:savedId,judul,isi,tips,updated_at:new Date().toISOString()});
+    toast(res?'✅ Panduan tersimpan ke Supabase!':'⚠️ Gagal simpan: '+lastApiError);
   }
   openAdminPanel('ziarah');
   renderAdmin();
@@ -1957,9 +2610,9 @@ async function confirmDelete(){
   if(type==='event'){ renderEvents(); if(document.getElementById('home-event-list')) renderHome(); }
   if(type==='ziarah'){ renderZiarah(); }
   if(dbConnected){
-    const actionName = type==='wali'?'deleteWali':(type==='event'?'deleteEvent':'deleteZiarah');
-    const res=await apiPost(actionName, {id:id});
-    toast(res&&res.ok?'🗑️ Data berhasil dihapus dari database':'⚠️ Gagal menghapus dari database.');
+    const table=type==='wali'?'pw_wali':(type==='event'?'pw_events':'pw_ziarah');
+    const ok=await sbDelete(table, id);
+    toast(ok?'🗑️ Data berhasil dihapus dari Supabase':'⚠️ Gagal menghapus: '+lastApiError);
   }
 }
 function closeConfirm(){document.getElementById('confirm-overlay').classList.remove('open');deleteTarget=null;}
@@ -2015,8 +2668,8 @@ function updateDbStatusBar(){
   } else {
     dot.style.background='var(--red)';
     txt.style.color='var(--red)';
-    txt.textContent=isApiConfigured()?'🔴 Gagal tersambung ke Database — perubahan hanya tersimpan sementara':'🔴 Mode Lokal — database belum disambungkan, lihat PANDUAN_SETUP_DATABASE.md';
-    if(bar && isApiConfigured() && lastApiError){
+    txt.textContent='🔴 Gagal tersambung ke Supabase — perubahan hanya tersimpan sementara di browser';
+    if(bar && lastApiError){
       bar.style.flexDirection='column';
       bar.style.alignItems='flex-start';
       let detail=document.getElementById('db-status-detail');
@@ -2032,75 +2685,61 @@ function updateDbStatusBar(){
 }
 
 // ─── INIT ───
-function sanitizeWaliList(list){
-  if(!Array.isArray(list)) return null;
-  const clean = list.filter(w => w && w.id!=null && !isNaN(Number(w.id)) && w.nama);
-  return clean.length ? clean : null;
+// ═══ SUPABASE DATA HELPERS ════════════════════════
+function rowToWali(r){
+  return {
+    id:Number(r.id), nama:r.nama||'', asli:r.asli||'', img:r.img||'',
+    lokasi:r.lokasi||'', wilayah:r.wilayah||'', asal:r.asal||'',
+    lahir:r.lahir||'', wafat:r.wafat||'', dakwah:r.dakwah||'',
+    peran:r.peran||'', bio:r.bio||'',
+    tags:asArr(r.tags), nasab:asArr(r.nasab), keluarga:asArr(r.keluarga),
+    murid:asArr(r.murid), ajaran:asArr(r.ajaran), karya:asArr(r.karya),
+    karomah:asArr(r.karomah), peninggalan:asArr(r.peninggalan),
+    galeri:asArr(r.galeri), makam:(r.makam&&typeof r.makam==='object'?r.makam:{})
+  };
 }
-function sanitizeEventList(list){
-  if(!Array.isArray(list)) return null;
-  const clean = list.filter(e => e && e.id!=null && !isNaN(Number(e.id)) && e.judul).map(e=>Object.assign({},e,{id:Number(e.id),tipe:e.tipe||'haul'}));
-  return clean.length ? clean : null;
+function rowToEvent(r){
+  return {id:Number(r.id),judul:r.judul||'',tipe:r.tipe||'event',
+    tanggal:r.tanggal||'',bulan:r.bulan||'',tahun:r.tahun||'',
+    lokasi:r.lokasi||'',waktu:r.waktu||'',img:r.img||'',
+    deskripsi:r.deskripsi||'',penyelenggara:r.penyelenggara||''};
 }
-function sanitizeZiarahList(list){
-  if(!Array.isArray(list)) return null;
-  const clean = list.filter(z => z && z.id!=null && !isNaN(Number(z.id)) && z.judul).map(z=>Object.assign({},z,{id:Number(z.id),tips:Array.isArray(z.tips)?z.tips:[]}));
-  return clean.length ? clean : null;
+function rowToZiarah(r){
+  return {id:Number(r.id),judul:r.judul||'',isi:r.isi||'',tips:asArr(r.tips)};
+}
+
+async function loadFromSupabase(){
+  const [waliRaw, eventsRaw, ziarahRaw] = await Promise.all([
+    sbGet('pw_wali'), sbGet('pw_events'), sbGet('pw_ziarah')
+  ]);
+  if(!waliRaw && !eventsRaw && !ziarahRaw){ lastApiError='Tidak ada respons dari Supabase'; return false; }
+  if(waliRaw && waliRaw.length)  DB.wali   = deduplicate(waliRaw.map(rowToWali));
+  if(eventsRaw && eventsRaw.length) DB.events = deduplicate(eventsRaw.map(rowToEvent));
+  if(ziarahRaw && ziarahRaw.length) DB.ziarah = deduplicate(ziarahRaw.map(rowToZiarah));
+  const [h,an,ar] = await Promise.all([
+    sbSettingGet('heroImg'), sbSettingGet('adminName'), sbSettingGet('adminRole')
+  ]);
+  if(h) heroImg=h;
+  if(an){ adminName=an; const el=document.getElementById('admin-aname'); if(el) el.textContent=an; }
+  if(ar){ adminRole=ar; const el=document.getElementById('admin-arole'); if(el) el.textContent=ar; }
+  return true;
 }
 
 async function initApp(){
-  // render dulu pakai data bawaan supaya aplikasi LANGSUNG bisa dipakai,
-  // tidak menunggu proses sambung ke database (yang bisa lambat/gagal)
-  updateDbStatusBar();
-  renderHome();
-  renderDir();
-  renderEvents();
-  renderZiarah();
-  renderAdmin();
-  renderQuote();
-  setInterval(rotateQuote,5000);
-
-  // baru setelah itu coba sambungkan ke database di latar belakang
+  // Render lokal dulu — aplikasi langsung bisa dipakai tanpa menunggu jaringan
+  renderHome(); renderDir(); renderEvents(); renderZiarah(); renderAdmin();
+  renderQuote(); setInterval(rotateQuote,5000);
+  // Sambungkan Supabase di latar belakang
   try{
-    const remote = await apiGet();
-    if(remote){
-      dbConnected = true;
-      const cleanWali = sanitizeWaliList(remote.wali);
-      const cleanEvents = sanitizeEventList(remote.events);
-      const cleanZiarah = sanitizeZiarahList(remote.ziarah);
-      const hasData = cleanWali || cleanEvents || cleanZiarah;
-      if(hasData){
-        // database sudah berisi data valid -> jadikan sumber data utama aplikasi
-        if(cleanWali) DB.wali = cleanWali;
-        if(cleanEvents) DB.events = cleanEvents;
-        if(cleanZiarah) DB.ziarah = cleanZiarah;
-        if(remote.settings){
-          if(remote.settings.heroImg) heroImg = remote.settings.heroImg;
-          if(remote.settings.adminName) adminName = remote.settings.adminName;
-          if(remote.settings.adminRole) adminRole = remote.settings.adminRole;
-        }
-      } else {
-        // database masih kosong/tidak valid -> kirim data bawaan sekali untuk mengisi sheet
-        await apiPost('seedInitialData', {data:{
-          wali: DB.wali, events: DB.events, ziarah: DB.ziarah,
-          settings: {heroImg: heroImg, adminName: adminName, adminRole: adminRole}
-        }});
-      }
-    } else {
-      console.warn('Mode offline: database belum disambungkan. Lihat PANDUAN_SETUP_DATABASE.md / variabel API_URL.');
-    }
-  }catch(err){
-    console.error('Gagal menyambungkan ke database, aplikasi tetap berjalan dengan data lokal:', err);
-    dbConnected = false;
+    const ok = await loadFromSupabase();
+    dbConnected = !!ok;
+  }catch(e){
+    dbConnected=false; lastApiError=String(e);
+    console.error('Gagal sambung Supabase:', e);
   }
-  // render ulang dengan data terbaru (kalau ada perubahan dari database) +
-  // perbarui badge status koneksi
   updateDbStatusBar();
-  renderHome();
-  renderDir();
-  renderEvents();
-  renderZiarah();
-  renderAdmin();
+  // Render ulang dengan data dari Supabase
+  renderHome(); renderDir(); renderEvents(); renderZiarah(); renderAdmin();
 }
 initApp();
 </script>
